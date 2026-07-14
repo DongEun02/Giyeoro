@@ -6,7 +6,7 @@
 
 - 언어, 난이도, 작업 유형을 기준으로 코드 이슈 탐색
 - GitHub 이슈 URL을 통한 공개 이슈 불러오기
-- 번역 기여 작업과 원문 비교
+- 실제 GitHub 영문·한국어 문서의 번역 상태 비교
 - 저장소별 기여 가이드 번역본 확인
 
 ## 실행
@@ -18,9 +18,15 @@ npm run dev
 
 개발 서버는 기본적으로 `http://127.0.0.1:5173`에서 실행됩니다.
 
-## AI 이슈 분석
+## AI 분석
 
 추천 목록 또는 URL로 불러온 공개 GitHub 이슈의 핵심 내용과 작업 범위를 AI가 한국어로 정리합니다. API 키는 브라우저 번들에 포함되지 않으며 로컬 개발 서버 또는 배포 환경의 서버리스 함수에서만 사용합니다.
+
+번역 기여 화면에서는 다음 공개 저장소의 영문 원문과 한국어 번역본, 최신 파일 커밋을 가져와 의미상 누락 범위를 분석합니다.
+
+- React: `reactjs/react.dev` ↔ `reactjs/ko.react.dev`
+- MDN: `mdn/content` ↔ `mdn/translated-content`
+- Vue: `vuejs/docs` ↔ `vuejs-translations/docs-ko`
 
 ```bash
 cp .env.example .env.local
@@ -34,7 +40,7 @@ GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
-Vercel에 배포할 때도 동일한 환경 변수를 프로젝트 설정에 등록합니다. `api/analyze-issue.js`가 서버리스 함수로 실행되므로 키를 `VITE_` 접두사로 노출하면 안 됩니다.
+Vercel에 배포할 때도 동일한 환경 변수를 프로젝트 설정에 등록합니다. `api/analyze-issue.js`와 `api/translation-status.js`가 서버리스 함수로 실행되므로 키를 `VITE_` 접두사로 노출하면 안 됩니다.
 
 GitHub 토큰은 선택 사항입니다. 공개 API 호출 제한을 높일 때만 추가합니다.
 

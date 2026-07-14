@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BrandMark, SITE_ICON_DATA_URL } from "./components/BrandMark.jsx";
 import { Icons, PRStatusBadge } from "./components/Icons.jsx";
 import { LanguageFilterBar } from "./components/LanguageFilterBar.jsx";
@@ -11,6 +11,7 @@ import {
   GUIDE_REPO_NAMES,
   ISSUE_TYPE_FILTERS,
   REPO_GUIDE_KEYS,
+  TRANSLATION_PROJECTS,
   TRANSLATION_PRESETS,
   TRANSLATION_TASKS,
   formatGithubDate,
@@ -19,6 +20,11 @@ import {
   parseGithubIssueUrl
 } from "./data/content.js";
 import { fetchRecommendedIssues } from "./services/githubRecommendations.js";
+import {
+  clearTranslationStatusCache,
+  fetchTranslationStatuses,
+  indexTranslationStatuses
+} from "./services/translationStatus.js";
 import { createWorkspaceItem, WORKSPACE_STATUSES } from "./services/userWorkspace.js";
 
 const LANDING_PREVIEW_ISSUES = [
@@ -52,16 +58,24 @@ export default function App() {
   // --- Navigation & States ---
   const [view, setView] = useState('landing'); // 'landing' | 'translation' | 'feature' | 'guide' | 'mypage'
   const [myPageStatus, setMyPageStatus] = useState('interested');
+  const [landingFeaturesVisible, setLandingFeaturesVisible] = useState(false);
+  const landingFeatureSectionRef = useRef(null);
 
   // Translation Screen States
   const [translationViewMode, setTranslationViewMode] = useState('list'); // 'list' | 'detail'
-  const [selectedRepo, setSelectedRepo] = useState('tanstack'); // 'tanstack' | 'react' | 'nextjs'
-  const [selectedDocId, setSelectedDocId] = useState('query-keys');
+  const [selectedRepo, setSelectedRepo] = useState('react');
+  const [selectedDocId, setSelectedDocId] = useState('useid');
   const [translationChecked, setTranslationChecked] = usePersistentState("oss:translation-checklist:v1", {
     fork: false, clone: false, branch: false, edit: false, pr: false
   });
   const [translationSearch, setTranslationQuery] = useState("");
   const [translationLanguage, setTranslationLanguage] = useState("All");
+  const [translationStatuses, setTranslationStatuses] = useState({});
+  const [translationStatusLoading, setTranslationStatusLoading] = useState(false);
+  const [translationStatusLoaded, setTranslationStatusLoaded] = useState(false);
+  const [translationStatusError, setTranslationStatusError] = useState("");
+  const [translationStatusGeneratedAt, setTranslationStatusGeneratedAt] = useState("");
+  const [translationStatusRefreshVersion, setTranslationStatusRefreshVersion] = useState(0);
 
   // Feature screen States
   const [featureViewMode, setFeatureViewMode] = useState('repo-list'); // 'repo-list' | 'detail'
@@ -104,6 +118,25 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [view, translationViewMode, featureViewMode, myPageStatus]);
+
+  useEffect(() => {
+    if (view !== 'landing' || landingFeaturesVisible) return undefined;
+
+    const section = landingFeatureSectionRef.current;
+    if (!section || typeof IntersectionObserver === 'undefined') {
+      setLandingFeaturesVisible(true);
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setLandingFeaturesVisible(true);
+      observer.disconnect();
+    }, { threshold: 0.18 });
+
+    observer.observe(section);
+    return () => observer.disconnect();
+  }, [view, landingFeaturesVisible]);
 
   useEffect(() => {
     let favicon = document.querySelector('link[rel="icon"]');
@@ -151,6 +184,45 @@ export default function App() {
       controller.abort();
     };
   }, [view, featureRecommendationsLoaded, recommendationRefreshVersion]);
+
+  useEffect(() => {
+    if (view !== 'translation' || translationStatusLoaded) return undefined;
+
+    const controller = new AbortController();
+    let active = true;
+    setTranslationStatusLoading(true);
+    setTranslationStatusError("");
+
+    fetchTranslationStatuses({
+      force: translationStatusRefreshVersion > 0,
+      signal: controller.signal
+    })
+      .then(result => {
+        if (!active) return;
+        setTranslationStatuses(indexTranslationStatuses(result));
+        setTranslationStatusGeneratedAt(result.generatedAt || "");
+        setTranslationStatusLoaded(true);
+      })
+      .catch(error => {
+        if (!active || error?.name === 'AbortError') return;
+        setTranslationStatusError(error?.message || "번역 상태를 확인하지 못했습니다.");
+        setTranslationStatusLoaded(true);
+      })
+      .finally(() => {
+        if (active) setTranslationStatusLoading(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [view, translationStatusLoaded, translationStatusRefreshVersion]);
+
+  const refreshTranslationStatuses = () => {
+    clearTranslationStatusCache();
+    setTranslationStatusLoaded(false);
+    setTranslationStatusRefreshVersion(version => version + 1);
+  };
 
   const triggerToast = (msg) => {
     setToast(msg);
@@ -302,8 +374,13 @@ export default function App() {
 
   const openWorkspaceItem = item => {
     if (item.kind === "translation") {
-      setSelectedRepo(item.data.repoKey);
-      setSelectedDocId(item.data.docId);
+      const projectKey = TRANSLATION_PROJECTS[item.data.repoKey] ? item.data.repoKey : "react";
+      const project = TRANSLATION_PROJECTS[projectKey];
+      const documentId = project.docs.some(document => document.id === item.data.docId)
+        ? item.data.docId
+        : project.docs[0].id;
+      setSelectedRepo(projectKey);
+      setSelectedDocId(documentId);
       setTranslationViewMode('detail');
       setView('translation');
       return;
@@ -402,7 +479,20 @@ export default function App() {
     }
   };
 
-  const filteredTranslationTasks = TRANSLATION_TASKS.filter(task => {
+  const liveTranslationTasks = TRANSLATION_TASKS
+    .map(task => {
+      const liveStatus = translationStatuses[task.id];
+      return {
+        ...task,
+        status: liveStatus?.status || "checking",
+        statusText: liveStatus?.statusText || "상태 확인 중",
+        summary: liveStatus?.summary || task.summary,
+        difficulty: liveStatus?.statusText || "상태 확인 중"
+      };
+    })
+    .filter(task => !translationStatusLoaded || task.status !== "completed");
+
+  const filteredTranslationTasks = liveTranslationTasks.filter(task => {
     const query = translationSearch.trim().toLowerCase();
     const matchSearch = !query || [task.repo, task.title, task.summary]
       .some(value => value.toLowerCase().includes(query));
@@ -436,6 +526,18 @@ export default function App() {
         minute: '2-digit'
       }).format(new Date(featureRecommendationsLoadedAt))
     : '';
+  const translationStatusGeneratedAtText = translationStatusGeneratedAt
+    ? new Intl.DateTimeFormat('ko-KR', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(new Date(translationStatusGeneratedAt))
+    : '';
+  const selectedTranslationProject = TRANSLATION_PROJECTS[selectedRepo] || TRANSLATION_PROJECTS.react;
+  const selectedTranslationDoc = selectedTranslationProject.docs.find(doc => doc.id === selectedDocId)
+    || selectedTranslationProject.docs[0];
+  const selectedTranslationStatus = translationStatuses[`translation-${selectedRepo}-${selectedTranslationDoc.id}`] || null;
 
   return (
     <>
@@ -575,7 +677,11 @@ export default function App() {
               </div>
             </section>
 
-            <section aria-labelledby="landing-feature-heading">
+            <section
+              ref={landingFeatureSectionRef}
+              className={`landing-feature-section${landingFeaturesVisible ? ' is-visible' : ''}`}
+              aria-labelledby="landing-feature-heading"
+            >
               <div className="landing-section-heading">
                 <div>
                   <h2 id="landing-feature-heading">필요한 도움을 선택하세요.</h2>
@@ -587,6 +693,7 @@ export default function App() {
                 <button
                   type="button"
                   className="landing-feature-card"
+                  style={{ '--landing-card-index': 0 }}
                   onClick={() => { setView('translation'); setTranslationViewMode('list'); }}
                 >
                   <div className="landing-feature-visual" aria-hidden="true">
@@ -607,6 +714,7 @@ export default function App() {
                 <button
                   type="button"
                   className="landing-feature-card"
+                  style={{ '--landing-card-index': 1 }}
                   onClick={() => { setView('feature'); setFeatureViewMode('repo-list'); setFeatureSourceMode('recommended'); }}
                 >
                   <div className="landing-feature-visual" aria-hidden="true">
@@ -627,6 +735,7 @@ export default function App() {
                 <button
                   type="button"
                   className="landing-feature-card"
+                  style={{ '--landing-card-index': 2 }}
                   onClick={() => { setView('guide'); setGuideRepoKey('tanstack'); }}
                 >
                   <div className="landing-feature-visual" aria-hidden="true">
@@ -702,6 +811,40 @@ export default function App() {
                   />
                 </div>
 
+                {translationStatusLoading && (
+                  <div className="recommendation-status" role="status">
+                    <span className="recommendation-status-spinner" aria-hidden="true" />
+                    <div>
+                      <strong>실제 문서의 번역 상태를 확인하고 있습니다.</strong>
+                      <span>GitHub의 영문 원문과 한국어 문서를 가져와 의미상 차이를 비교합니다.</span>
+                    </div>
+                  </div>
+                )}
+
+                {translationStatusError && !translationStatusLoading && (
+                  <div className="recommendation-status recommendation-status-error" role="alert">
+                    <Icons.Alert className="w-4 h-4 shrink-0" />
+                    <div>
+                      <strong>번역 상태를 확인하지 못했습니다.</strong>
+                      <span>{translationStatusError}</span>
+                    </div>
+                    <button type="button" className="translation-status-refresh" onClick={refreshTranslationStatuses}>
+                      <Icons.Refresh className="w-3.5 h-3.5" />
+                      다시 확인
+                    </button>
+                  </div>
+                )}
+
+                {translationStatusLoaded && !translationStatusError && !translationStatusLoading && (
+                  <div className="translation-live-status">
+                    <span><i aria-hidden="true" />GitHub 문서 비교 완료 · {translationStatusGeneratedAtText}</span>
+                    <button type="button" onClick={refreshTranslationStatuses} title="번역 상태 새로고침">
+                      <Icons.Refresh className="w-3.5 h-3.5" />
+                      <span>새로고침</span>
+                    </button>
+                  </div>
+                )}
+
                 <div className="contribution-list">
                   {filteredTranslationTasks.length > 0 ? filteredTranslationTasks.map(task => (
                     <article
@@ -732,7 +875,9 @@ export default function App() {
                         <h3 className="contribution-title">{task.title}</h3>
                         <p className="contribution-summary">{task.summary}</p>
                         <div className="contribution-meta">
-                          <span className="contribution-chip contribution-chip-accent">{task.difficulty}</span>
+                          <span className={`contribution-chip translation-task-status translation-task-status-${task.status}`}>
+                            {task.statusText}
+                          </span>
                           {task.languageTags.map(language => (
                             <span key={`${task.id}-${language}`} className="contribution-chip">{language}</span>
                           ))}
@@ -784,47 +929,45 @@ export default function App() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h2 className="text-lg font-bold text-[#24292f]">{TRANSLATION_PRESETS[selectedRepo].name}</h2>
+                        <h2 className="text-lg font-bold text-[#24292f]">{selectedTranslationProject.name}</h2>
                         <button
-                          onClick={() => toggleBookmark(TRANSLATION_PRESETS[selectedRepo].name)}
+                          onClick={() => toggleBookmark(selectedTranslationProject.name)}
                           className="text-slate-400 hover:text-amber-500 transition-colors"
                         >
-                          <Icons.Bookmark filled={bookmarks[TRANSLATION_PRESETS[selectedRepo].name]} className="w-4 h-4 text-amber-500" />
+                          <Icons.Bookmark filled={bookmarks[selectedTranslationProject.name]} className="w-4 h-4 text-amber-500" />
                         </button>
                       </div>
-                      <p className="text-xs text-[#57606a]">{TRANSLATION_PRESETS[selectedRepo].description}</p>
+                      <p className="text-xs text-[#57606a]">{selectedTranslationProject.description}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="translation-detail-layout">
 
                     {/* 1. Left side: Select Document Sidebar List */}
-                    <div className="lg:col-span-3 space-y-3">
+                    <div className="translation-detail-sidebar space-y-3">
                       <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider block">번역 대상 가이드 문서</span>
                       <div className="space-y-1.5">
-                        {TRANSLATION_PRESETS[selectedRepo].docs.map(doc => (
-                          <button
-                            key={doc.id}
-                            onClick={() => setSelectedDocId(doc.id)}
-                            className={`w-full text-left px-3.5 py-3 rounded-md border transition-all ${
-                              selectedDocId === doc.id
-                                ? "bg-white border-[#d0d7de] ring-1 ring-[#3f6fd9] shadow-sm"
-                                : "bg-[#f6f8fa] border-[#d0d7de] hover:border-slate-300 hover:bg-white"
-                            }`}
-                          >
-                            <h4 className="text-xs font-bold text-[#24292f] mb-1.5">{doc.title}</h4>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              doc.status === 'completed'
-                                ? "bg-[#eef3ff] text-[#3f6fd9] border border-[#d5e0f8]"
-                                : doc.status === 'alert'
-                                ? "bg-[#fff8c5] text-[#9a6700] border border-[#f8e3a1]"
-                                : "bg-[#ffebe9] text-[#cf222e] border border-[#ffc1c0]"
-                            }`}>
-                              {doc.statusText}
-                            </span>
-                          </button>
-                        ))}
+                        {selectedTranslationProject.docs.map(doc => {
+                          const liveDoc = translationStatuses[`translation-${selectedRepo}-${doc.id}`];
+                          const status = liveDoc?.status || "checking";
+                          return (
+                            <button
+                              key={doc.id}
+                              onClick={() => setSelectedDocId(doc.id)}
+                              className={`w-full text-left px-3.5 py-3 rounded-md border transition-all ${
+                                selectedDocId === doc.id
+                                  ? "bg-white border-[#d0d7de] ring-1 ring-[#3f6fd9] shadow-sm"
+                                  : "bg-[#f6f8fa] border-[#d0d7de] hover:border-slate-300 hover:bg-white"
+                              }`}
+                            >
+                              <h4 className="text-xs font-bold text-[#24292f] mb-1.5">{doc.title}</h4>
+                              <span className={`translation-detail-status translation-detail-status-${status}`}>
+                                {liveDoc?.statusText || (translationStatusError ? "확인 실패" : "상태 확인 중")}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
 
                       {/* Tips Card Widget */}
@@ -838,80 +981,77 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 2. Middle side: Split Source & Translation View Area (GitHub Diff Style) */}
-                    <div className="lg:col-span-6 space-y-4">
-                      <div className="bg-white border border-[#d0d7de] rounded-md overflow-hidden shadow-sm">
-
-                        {/* Panel Header */}
-                        <div className="bg-[#f6f8fa] px-4 py-2.5 border-b border-[#d0d7de] flex justify-between items-center text-xs">
-                          <span className="font-bold text-[#24292f]">split_diff_editor.md</span>
-                          <span className="text-[10px] bg-[#fff8c5] text-[#9a6700] px-2 py-0.5 rounded font-bold border border-[#f8e3a1]">번역 필요 구간 존재</span>
-                        </div>
-
-                        {/* Split Dual-Pane */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[#d0d7de] h-[380px] overflow-y-auto font-mono">
-
-                          {/* Left Pane: English Raw */}
-                          <div className="space-y-0 text-[11px] leading-relaxed text-[#24292f]">
-                            <div className="flex items-center gap-2 border-b border-[#d0d7de] bg-[#f6f8fa] p-2">
-                              <span className="font-bold text-slate-400">EN</span>
-                              <span className="font-semibold text-slate-600">English Source</span>
-                            </div>
-                            <div className="divide-y divide-slate-100">
-                              {TRANSLATION_PRESETS[selectedRepo].docContent[selectedDocId] ? (
-                                TRANSLATION_PRESETS[selectedRepo].docContent[selectedDocId].en.map((para, i) => (
-                                  <div key={i} className={`flex items-start ${para.highlight ? "bg-[#fff8c5]/40" : ""}`}>
-                                    <span className="bg-[#f6f8fa] text-slate-400 text-right pr-2 select-none w-8 border-r border-[#d0d7de] py-2 text-[10px]">
-                                      {i + 1}
-                                    </span>
-                                    <p className="p-2.5 flex-grow font-sans text-xs">
-                                      {para.text}
-                                    </p>
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-slate-400 italic p-4 font-sans text-xs">이 문서는 아직 상세 단락 대조가 세팅되지 않았습니다. 다른 문서를 선택하세요.</p>
-                              )}
-                            </div>
+                    {/* 2. Middle side: live source comparison */}
+                    <div className="translation-detail-main space-y-4">
+                      <section className="translation-analysis-card">
+                        <header className="translation-analysis-header">
+                          <div>
+                            <span>실제 GitHub 문서 비교</span>
+                            <strong>{selectedTranslationDoc.title}</strong>
                           </div>
+                          <span className={`translation-detail-status translation-detail-status-${selectedTranslationStatus?.status || "checking"}`}>
+                            {selectedTranslationStatus?.statusText || (translationStatusError ? "확인 실패" : "상태 확인 중")}
+                          </span>
+                        </header>
 
-                          {/* Right Pane: Korean Target Translation */}
-                          <div className="space-y-0 text-[11px] leading-relaxed text-[#24292f]">
-                            <div className="flex items-center justify-between border-b border-[#d0d7de] bg-[#f6f8fa] p-2">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-400">KO</span>
-                                <span className="font-semibold text-slate-600">Korean Translation</span>
+                        {translationStatusLoading && (
+                          <div className="translation-analysis-pending" role="status">
+                            <span className="recommendation-status-spinner" aria-hidden="true" />
+                            <p>영문 원문과 한국어 번역본의 의미상 차이를 비교하고 있습니다.</p>
+                          </div>
+                        )}
+
+                        {translationStatusError && !translationStatusLoading && (
+                          <div className="translation-analysis-error" role="alert">
+                            <Icons.Alert className="w-4 h-4" />
+                            <p>{translationStatusError}</p>
+                            <button type="button" onClick={refreshTranslationStatuses}>다시 확인</button>
+                          </div>
+                        )}
+
+                        {selectedTranslationStatus && !translationStatusLoading && (
+                          <div className="translation-analysis-content">
+                            <div className="translation-analysis-summary">
+                              <span>판정 근거 · 신뢰도 {selectedTranslationStatus.confidence}</span>
+                              <p>{selectedTranslationStatus.summary}</p>
+                            </div>
+
+                            {selectedTranslationStatus.missingSections.length > 0 && (
+                              <div className="translation-missing-sections">
+                                <span>확인이 필요한 내용</span>
+                                <ul>
+                                  {selectedTranslationStatus.missingSections.map(section => <li key={section}>{section}</li>)}
+                                </ul>
                               </div>
-                            </div>
-                            <div className="divide-y divide-slate-100">
-                              {TRANSLATION_PRESETS[selectedRepo].docContent[selectedDocId] ? (
-                                TRANSLATION_PRESETS[selectedRepo].docContent[selectedDocId].ko.map((para, i) => (
-                                  <div key={i} className={`flex items-start relative ${para.highlight ? "bg-[#fff8c5]/40" : ""}`}>
-                                    <span className="bg-[#f6f8fa] text-slate-400 text-right pr-2 select-none w-8 border-r border-[#d0d7de] py-2 text-[10px]">
-                                      {i + 1}
-                                    </span>
-                                    <div className="p-2.5 flex-grow font-sans text-xs pr-20">
-                                      {para.needsTranslation && (
-                                        <span className="absolute top-2 right-2 bg-[#fff8c5] text-[#9a6700] font-bold text-[9px] px-1.5 py-0.5 rounded border border-[#f8e3a1]">
-                                          번역 대기
-                                        </span>
-                                      )}
-                                      <p>{para.text}</p>
-                                    </div>
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-slate-400 italic p-4 font-sans text-xs">한국어 데이터 셋을 불러오고 있습니다.</p>
-                              )}
+                            )}
+
+                            <div className="translation-source-list">
+                              <a href={selectedTranslationStatus.source.url} target="_blank" rel="noreferrer">
+                                <div>
+                                  <span>영문 원문</span>
+                                  <strong>{selectedTranslationStatus.source.repo}</strong>
+                                  <code>{selectedTranslationStatus.source.path}</code>
+                                </div>
+                                <em>{formatGithubDate(selectedTranslationStatus.source.committedAt)} · {selectedTranslationStatus.source.commitSha.slice(0, 7)}</em>
+                                <Icons.ArrowRight className="w-3.5 h-3.5" />
+                              </a>
+                              <a href={selectedTranslationStatus.translation.url} target="_blank" rel="noreferrer">
+                                <div>
+                                  <span>한국어 번역본</span>
+                                  <strong>{selectedTranslationStatus.translation.repo}</strong>
+                                  <code>{selectedTranslationStatus.translation.path}</code>
+                                </div>
+                                <em>{formatGithubDate(selectedTranslationStatus.translation.committedAt)} · {selectedTranslationStatus.translation.commitSha.slice(0, 7)}</em>
+                                <Icons.ArrowRight className="w-3.5 h-3.5" />
+                              </a>
                             </div>
                           </div>
-
-                        </div>
-                      </div>
+                        )}
+                      </section>
                     </div>
 
                     {/* 3. Right side: Interactive Checklist */}
-                    <div className="lg:col-span-3 space-y-4">
+                    <div className="translation-detail-checklist space-y-4">
                       <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider block">번역 패치 기여 로드맵</span>
                       <div className="bg-white border border-[#d0d7de] rounded-md p-4 space-y-4 shadow-sm">
                         <span className="text-xs font-bold text-[#24292f] block pb-2 border-b border-[#d0d7de]">실시간 기여 체크리스트</span>
@@ -932,7 +1072,7 @@ export default function App() {
                                 {key === 'fork' && '오픈소스 레포지토리 Fork 생성'}
                                 {key === 'clone' && '로컬 컴퓨터에 git clone 및 환경 매칭'}
                                 {key === 'branch' && '새 작업 브랜치 개설'}
-                                {key === 'edit' && '위 에디터 대조 영역 기반 번역 가필'}
+                                {key === 'edit' && '비교 결과와 실제 원문을 기준으로 번역 수정'}
                                 {key === 'pr' && '기여 원격 브랜치에 문서 PR 생성 완료'}
                               </span>
                             </label>
@@ -941,7 +1081,7 @@ export default function App() {
 
                         <div className="pt-3 border-t border-[#d0d7de]">
                           <div className="bg-[#eef3ff] text-[#3f6fd9] text-[10px] p-2.5 rounded border border-[#d5e0f8] font-semibold leading-relaxed">
-                            모든 단계 체크 완료 시, 해당 오픈소스 레포지토리에 나의 이름이 기여자로 정식 등재됩니다! 🎉
+                            체크리스트는 작업 순서를 기록하기 위한 용도입니다. 제출 전 해당 저장소의 기여 규칙을 다시 확인하세요.
                           </div>
                         </div>
                       </div>
@@ -1782,15 +1922,17 @@ export default function App() {
 
       <footer className="app-footer">
         <div className="app-footer-inner">
-          <div className="app-footer-brand">
-            <span className="brand-mark"><BrandMark /></span>
-            <strong>OSS</strong>
-          </div>
-          <div className="app-footer-links">
-            <a href="#">서비스 소개</a>
-            <a href="#">이용약관</a>
-            <a href="#">개인정보 처리방침</a>
-            <a href="#">문의하기</a>
+          <div className="app-footer-top">
+            <div className="app-footer-brand">
+              <span className="brand-mark"><BrandMark /></span>
+              <strong>OSS</strong>
+            </div>
+            <div className="app-footer-links">
+              <a href="#">서비스 소개</a>
+              <a href="#">이용약관</a>
+              <a href="#">개인정보 처리방침</a>
+              <a href="#">문의하기</a>
+            </div>
           </div>
           <p>오픈소스 첫 기여를 찾고 준비하는 작업 공간입니다. © 2026 OSS</p>
         </div>

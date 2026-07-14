@@ -1,3 +1,7 @@
+import { TRANSLATION_PROJECTS } from "../../shared/translationSources.js";
+
+export { TRANSLATION_PROJECTS } from "../../shared/translationSources.js";
+
 export const TRANSLATION_PRESETS = {
   tanstack: {
     name: "TanStack Query",
@@ -333,23 +337,22 @@ export const FEATURE_RECOMMENDATIONS = [
   }
 ];
 
-export const TRANSLATION_TASKS = Object.entries(TRANSLATION_PRESETS).flatMap(([repoKey, repo]) =>
+export const TRANSLATION_TASKS = Object.entries(TRANSLATION_PROJECTS).flatMap(([repoKey, repo]) =>
   repo.docs
-    .filter(doc => doc.status !== "completed")
     .map(doc => ({
       id: `translation-${repoKey}-${doc.id}`,
       repoKey,
       docId: doc.id,
       repo: repo.name,
       title: `${doc.title} 한국어 번역 업데이트`,
-      summary: `${doc.statusText}. 영어 원문과 현재 한국어 문서를 대조해 변경된 문단을 반영합니다.`,
+      summary: "실제 GitHub 영문 원문과 한국어 문서를 비교해 최신 번역 상태를 확인합니다.",
       difficulty: "Beginner",
       languageTags: repo.languageTags,
       techs: repo.techStack.slice(0, 2)
     }))
 );
 
-export const LANGUAGE_FILTERS = ["All", "JavaScript", "TypeScript", "Python", "Java", "Kotlin", "Swift", "Go", "Rust"];
+export const LANGUAGE_FILTERS = ["All", "JavaScript", "TypeScript", "HTML/CSS", "Python", "Java", "Kotlin", "Swift", "Go", "Rust"];
 
 export const DIFFICULTY_FILTERS = [
   { value: "All", label: "전체 난이도" },
@@ -392,7 +395,10 @@ export const REPO_VISUALS = {
   "React (공식 한국어 문서)": { image: "https://github.com/facebook.png?size=320", background: "#eef8fb" },
   "facebook/react": { image: "https://github.com/facebook.png?size=320", background: "#eef8fb" },
   "Next.js": { image: "https://github.com/vercel.png?size=320", background: "#f0f1f3" },
-  "vercel/next.js": { image: "https://github.com/vercel.png?size=320", background: "#f0f1f3" }
+  "vercel/next.js": { image: "https://github.com/vercel.png?size=320", background: "#f0f1f3" },
+  "React 한국어 문서": { image: "https://github.com/reactjs.png?size=320", background: "#eef8fb" },
+  "MDN 한국어 문서": { image: "https://github.com/mdn.png?size=320", background: "#f2f4fb" },
+  "Vue 한국어 문서": { image: "https://github.com/vuejs.png?size=320", background: "#edf8f3" }
 };
 
 export const getRepoVisual = (repoName) => REPO_VISUALS[repoName] || {
