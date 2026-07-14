@@ -75,6 +75,7 @@ export default function App() {
   const [translationStatusLoaded, setTranslationStatusLoaded] = useState(false);
   const [translationStatusError, setTranslationStatusError] = useState("");
   const [translationStatusGeneratedAt, setTranslationStatusGeneratedAt] = useState("");
+  const [translationStatusStale, setTranslationStatusStale] = useState(false);
   const [translationStatusRefreshVersion, setTranslationStatusRefreshVersion] = useState(0);
 
   // Feature screen States
@@ -154,6 +155,7 @@ export default function App() {
     if (view !== 'feature' || featureRecommendationsLoaded) return undefined;
 
     const controller = new AbortController();
+    const requestTimeout = setTimeout(() => controller.abort(), 45_000);
     let active = true;
     setFeatureRecommendationsLoading(true);
     setFeatureRecommendationsError("");
@@ -165,30 +167,37 @@ export default function App() {
     })
       .then(result => {
         if (!active) return;
+        clearTimeout(requestTimeout);
         setFeatureIssues(result.issues);
         setFeatureRecommendationFailures(result.failedRepositories);
         setFeatureRecommendationsLoadedAt(result.loadedAt);
+        setFeatureRecommendationsLoading(false);
         setFeatureRecommendationsLoaded(true);
       })
       .catch(error => {
-        if (!active || error?.name === 'AbortError') return;
-        setFeatureRecommendationsError(error?.message || "GitHub 추천 이슈를 불러오지 못했습니다.");
+        if (!active) return;
+        clearTimeout(requestTimeout);
+        setFeatureRecommendationsError(
+          error?.name === 'AbortError'
+            ? "추천 이슈를 불러오는 시간이 초과됐습니다."
+            : error?.message || "GitHub 추천 이슈를 불러오지 못했습니다."
+        );
+        setFeatureRecommendationsLoading(false);
         setFeatureRecommendationsLoaded(true);
-      })
-      .finally(() => {
-        if (active) setFeatureRecommendationsLoading(false);
       });
 
     return () => {
       active = false;
+      clearTimeout(requestTimeout);
       controller.abort();
     };
-  }, [view, featureRecommendationsLoaded, recommendationRefreshVersion]);
+  }, [view, recommendationRefreshVersion]);
 
   useEffect(() => {
     if (view !== 'translation' || translationStatusLoaded) return undefined;
 
     const controller = new AbortController();
+    const requestTimeout = setTimeout(() => controller.abort(), 45_000);
     let active = true;
     setTranslationStatusLoading(true);
     setTranslationStatusError("");
@@ -199,24 +208,31 @@ export default function App() {
     })
       .then(result => {
         if (!active) return;
+        clearTimeout(requestTimeout);
         setTranslationStatuses(indexTranslationStatuses(result));
         setTranslationStatusGeneratedAt(result.generatedAt || "");
+        setTranslationStatusStale(!!result.stale);
+        setTranslationStatusLoading(false);
         setTranslationStatusLoaded(true);
       })
       .catch(error => {
-        if (!active || error?.name === 'AbortError') return;
-        setTranslationStatusError(error?.message || "번역 상태를 확인하지 못했습니다.");
+        if (!active) return;
+        clearTimeout(requestTimeout);
+        setTranslationStatusError(
+          error?.name === 'AbortError'
+            ? "번역 상태를 확인하는 시간이 초과됐습니다. 다시 시도해 주세요."
+            : error?.message || "번역 상태를 확인하지 못했습니다."
+        );
+        setTranslationStatusLoading(false);
         setTranslationStatusLoaded(true);
-      })
-      .finally(() => {
-        if (active) setTranslationStatusLoading(false);
       });
 
     return () => {
       active = false;
+      clearTimeout(requestTimeout);
       controller.abort();
     };
-  }, [view, translationStatusLoaded, translationStatusRefreshVersion]);
+  }, [view, translationStatusRefreshVersion]);
 
   const refreshTranslationStatuses = () => {
     clearTranslationStatusCache();
@@ -837,7 +853,7 @@ export default function App() {
 
                 {translationStatusLoaded && !translationStatusError && !translationStatusLoading && (
                   <div className="translation-live-status">
-                    <span><i aria-hidden="true" />GitHub 문서 비교 완료 · {translationStatusGeneratedAtText}</span>
+                    <span><i aria-hidden="true" />{translationStatusStale ? "캐시된 비교 결과" : "GitHub 문서 비교 완료"} · {translationStatusGeneratedAtText}</span>
                     <button type="button" onClick={refreshTranslationStatuses} title="번역 상태 새로고침">
                       <Icons.Refresh className="w-3.5 h-3.5" />
                       <span>새로고침</span>

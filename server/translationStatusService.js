@@ -324,6 +324,15 @@ export const handleTranslationStatusRequest = async (request, response, options 
     const result = await analyzeTranslationStatus({ apiKey, githubToken, model, force });
     jsonResponse(response, 200, result);
   } catch (error) {
+    const errorCode = String(error?.message || "");
+    if (latestResponse && ["GITHUB_RATE_LIMIT", "GITHUB_FETCH_FAILED"].includes(errorCode)) {
+      jsonResponse(response, 200, {
+        ...latestResponse.value,
+        cached: true,
+        stale: true
+      });
+      return;
+    }
     const [status, message] = errorMessage(error);
     console.error(`[Translation status] ${status}: ${message}`);
     jsonResponse(response, status, { error: message });
