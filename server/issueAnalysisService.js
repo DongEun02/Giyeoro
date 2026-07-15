@@ -1,7 +1,9 @@
 import { DEFAULT_NVIDIA_MODEL, generateNvidiaJson } from "./nvidiaClient.js";
+import { fetchOpenSourceRepository } from "./githubRepositoryService.js";
 
 const cache = new Map();
 const inFlight = new Map();
+const repositoryCache = new Map();
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const REQUEST_LIMIT_BYTES = 16 * 1024;
 const DEFAULT_MODEL = DEFAULT_NVIDIA_MODEL;
@@ -157,6 +159,17 @@ const fetchGithubIssue = async (issue, githubToken) => {
   };
 };
 
+const fetchVerifiedRepository = async (issue, githubToken) => {
+  const fullName = `${issue.owner}/${issue.repo}`;
+  const cacheKey = fullName.toLowerCase();
+  const cached = repositoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) return cached.value;
+
+  const repository = await fetchOpenSourceRepository(fullName, githubToken);
+  repositoryCache.set(cacheKey, { value: repository, cachedAt: Date.now() });
+  return repository;
+};
+
 const validateAnalysis = analysis => {
   const requiredStrings = ["translatedTitleKo", "summaryKo", "workType"];
   if (!analysis || requiredStrings.some(key => typeof analysis[key] !== "string" || !analysis[key].trim())) {
@@ -205,6 +218,7 @@ const analyzeWithCache = async (parsedIssue, options) => {
   if (inFlight.has(key)) return inFlight.get(key);
 
   const task = (async () => {
+    await fetchVerifiedRepository(parsedIssue, options.githubToken);
     const issue = await fetchGithubIssue(parsedIssue, options.githubToken);
     const result = await runIssueAnalysis(issue, options);
     const value = { issue, ...result, cached: false };
@@ -221,8 +235,14 @@ const errorMessage = error => {
   if (message === "REQUEST_TOO_LARGE") return [413, "요청 데이터가 너무 큽니다."];
   if (message === "INVALID_JSON") return [400, "올바른 JSON 요청이 아닙니다."];
   if (message === "GITHUB_NOT_FOUND") return [404, "GitHub 이슈를 찾을 수 없습니다."];
+  if (message === "GITHUB_REPOSITORY_NOT_FOUND") return [404, "GitHub 저장소를 찾을 수 없습니다."];
   if (message === "GITHUB_RATE_LIMIT") return [429, "GitHub API 요청 한도에 도달했습니다."];
   if (message === "GITHUB_PULL_REQUEST") return [400, "Pull Request가 아닌 Issue URL을 입력해 주세요."];
+  if (message === "REPOSITORY_NOT_OPEN_SOURCE") {
+    return [422, "공개 저장소이며 GitHub에서 라이선스가 확인되는 오픈소스 이슈만 조회할 수 있습니다."];
+  }
+  if (message === "REPOSITORY_INACTIVE") return [422, "보관되었거나 비활성화된 저장소입니다."];
+  if (error?.name === "TimeoutError") return [504, "GitHub 조회 시간이 초과됐습니다."];
   if (message === "NVIDIA_KEY_MISSING") return [503, "AI 분석 API 키가 설정되지 않았습니다."];
   if (["AI_INVALID_RESPONSE", "NVIDIA_INVALID_RESPONSE", "NVIDIA_EMPTY_RESPONSE"].includes(message)) {
     return [502, "AI가 올바른 분석 결과를 반환하지 않았습니다."];
@@ -305,8 +325,9 @@ export const handleGithubIssueRequest = async (request, response, options = {}) 
   }
 
   try {
+    const repository = await fetchVerifiedRepository(parsedIssue, githubToken);
     const issue = await fetchGithubIssue(parsedIssue, githubToken);
-    jsonResponse(response, 200, { issue });
+    jsonResponse(response, 200, { issue, repository });
   } catch (error) {
     const [status, message] = errorMessage(error);
     console.error(`[GitHub issue] ${status}: ${message}`);

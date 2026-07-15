@@ -13,6 +13,7 @@ import {
   matchesLanguage
 } from "./data/content.js";
 import { fetchContributionGuide } from "./services/contributionGuide.js";
+import { fetchGithubIssueByUrl } from "./services/githubIssue.js";
 import { fetchRecommendedIssues } from "./services/githubRecommendations.js";
 import { fetchRepositoryIssues } from "./services/repositoryIssues.js";
 import { fetchTrendingRepositories } from "./services/trendingRepositories.js";
@@ -82,12 +83,15 @@ export default function App() {
   const [selectedIssueType, setSelectedIssueType] = useState("All");
   const [featureRepoSearch, setFeatureRepoSearch] = useState("");
   const [featureRepoLanguage, setFeatureRepoLanguage] = useState("All");
-  const [featureSourceMode, setFeatureSourceMode] = useState('recommended'); // 'recommended' | 'repository'
+  const [featureSourceMode, setFeatureSourceMode] = useState('recommended'); // 'recommended' | 'repository' | 'issue-url'
   const [repositoryQuery, setRepositoryQuery] = useState("");
   const [repositoryIssues, setRepositoryIssues] = useState([]);
   const [repositoryIssueResult, setRepositoryIssueResult] = useState(null);
   const [repositoryIssuesLoading, setRepositoryIssuesLoading] = useState(false);
   const [repositoryIssuesError, setRepositoryIssuesError] = useState("");
+  const [issueUrlQuery, setIssueUrlQuery] = useState("");
+  const [issueUrlLoading, setIssueUrlLoading] = useState(false);
+  const [issueUrlError, setIssueUrlError] = useState("");
   const [codexAnalysis, setCodexAnalysis] = useState(null);
   const [codexAnalysisLoading, setCodexAnalysisLoading] = useState(false);
   const [codexAnalysisError, setCodexAnalysisError] = useState("");
@@ -475,6 +479,19 @@ export default function App() {
       const translatedIssueFields = {
         titleKo: nextAnalysis.translatedTitleKo,
         summaryKo: nextAnalysis.summaryKo,
+        difficulty: nextAnalysis.difficulty.level === "판단 보류"
+          ? "난이도 판단 보류"
+          : `예상 ${nextAnalysis.difficulty.level}`,
+        difficultyLevel: {
+          "첫 기여": "starter",
+          "중간": "medium",
+          "도전": "challenging"
+        }[nextAnalysis.difficulty.level] || "unlabeled",
+        difficultySource: "ai-analysis",
+        difficultyConfidence: nextAnalysis.difficulty.confidence,
+        difficultyReason: nextAnalysis.difficulty.rationale,
+        workType: nextAnalysis.workType === "기타" ? "유형 미분류" : nextAnalysis.workType,
+        typeLabel: nextAnalysis.workType === "기타" ? "유형 미분류" : nextAnalysis.workType,
         codexAnalysis: nextAnalysis
       };
 
@@ -504,6 +521,8 @@ export default function App() {
             ...matchingItem,
             title: nextAnalysis.translatedTitleKo,
             summary: nextAnalysis.summaryKo,
+            difficulty: translatedIssueFields.difficulty,
+            workType: translatedIssueFields.workType,
             updatedAt: new Date().toISOString(),
             data: {
               ...matchingItem.data,
@@ -547,11 +566,9 @@ export default function App() {
     setSelectedPrId("");
     setCodexAnalysis(savedIssue.codexAnalysis || null);
     setCodexAnalysisError("");
-    setFeatureSourceMode(
-      savedIssue.source === 'github-import' || savedIssue.source === 'github-repository'
-        ? 'repository'
-        : 'recommended'
-    );
+    setFeatureSourceMode(savedIssue.source === 'github-import'
+      ? 'issue-url'
+      : savedIssue.source === 'github-repository' ? 'repository' : 'recommended');
     setFeatureViewMode('detail');
     setView('feature');
     if (!savedIssue.codexAnalysis) void analyzeIssueWithCodex(savedIssue.url);
@@ -593,6 +610,28 @@ export default function App() {
     if (!issue.codexAnalysis) void analyzeIssueWithCodex(issue.url);
   };
 
+  const loadIssueByUrl = async event => {
+    event.preventDefault();
+    const query = issueUrlQuery.trim();
+    if (!query) {
+      setIssueUrlError("GitHub Issue URL을 입력해 주세요.");
+      return;
+    }
+
+    setIssueUrlLoading(true);
+    setIssueUrlError("");
+
+    try {
+      const issue = await fetchGithubIssueByUrl(query);
+      setIssueUrlQuery(issue.url);
+      openIssueDetail(issue);
+    } catch (error) {
+      setIssueUrlError(error instanceof Error ? error.message : "GitHub 이슈를 불러오지 못했습니다.");
+    } finally {
+      setIssueUrlLoading(false);
+    }
+  };
+
   const liveTranslationTasks = TRANSLATION_TASKS
     .map(task => {
       const liveStatus = translationStatuses[task.id];
@@ -614,7 +653,9 @@ export default function App() {
     return matchSearch && matchLanguage;
   });
 
-  const activeFeatureIssues = featureSourceMode === 'repository' ? repositoryIssues : featureIssues;
+  const activeFeatureIssues = featureSourceMode === 'repository'
+    ? repositoryIssues
+    : featureSourceMode === 'recommended' ? featureIssues : [];
   const filteredFeatureIssues = activeFeatureIssues.filter(issue => {
     const query = featureRepoSearch.trim().toLowerCase();
     const matchSearch = !query || [issue.repo, issue.title, issue.summary, issue.workType, issue.typeLabel]
@@ -1233,7 +1274,7 @@ export default function App() {
                     >
                       GitHub 월간 Trending
                     </a>{' '}
-                    오픈소스의 추천 목록을 살펴보거나 저장소 이름으로 직접 찾을 수 있습니다.
+                    오픈소스 추천 목록을 살펴보거나 저장소 이름과 이슈 URL로 직접 찾을 수 있습니다.
                   </p>
                 </div>
 
@@ -1263,6 +1304,19 @@ export default function App() {
                     className={`feature-source-tab ${featureSourceMode === 'repository' ? 'feature-source-tab-active' : ''}`}
                   >
                     저장소로 찾기
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={featureSourceMode === 'issue-url'}
+                    onClick={() => {
+                      setFeatureSourceMode('issue-url');
+                      setIssueUrlError("");
+                      resetFeatureIssueFilters();
+                    }}
+                    className={`feature-source-tab ${featureSourceMode === 'issue-url' ? 'feature-source-tab-active' : ''}`}
+                  >
+                    이슈 URL로 찾기
                   </button>
                 </div>
 
@@ -1346,7 +1400,7 @@ export default function App() {
                   />
                 )}
                   </>
-                ) : (
+                ) : featureSourceMode === 'repository' ? (
                   <div className="space-y-5">
                     <section className="issue-import-panel" aria-labelledby="repository-search-heading">
                       <h3 id="repository-search-heading">저장소 추천 이슈 찾기</h3>
@@ -1460,6 +1514,58 @@ export default function App() {
                       </>
                     )}
                   </div>
+                ) : (
+                  <div className="space-y-5">
+                    <section className="issue-import-panel" aria-labelledby="issue-url-search-heading">
+                      <h3 id="issue-url-search-heading">GitHub 이슈 URL로 찾기</h3>
+                      <p>작업했거나 관심 있는 이슈 URL을 입력하면 원문을 불러와 핵심 내용과 기여 난이도를 분석합니다.</p>
+
+                      <form className="issue-import-form" onSubmit={loadIssueByUrl}>
+                        <div className="issue-import-input-wrap">
+                          <Icons.GitIssue className="w-4 h-4" />
+                          <input
+                            type="url"
+                            value={issueUrlQuery}
+                            onChange={(event) => {
+                              setIssueUrlQuery(event.target.value);
+                              setIssueUrlError("");
+                            }}
+                            placeholder="https://github.com/owner/repository/issues/123"
+                            aria-label="GitHub 이슈 URL"
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck="false"
+                            className="issue-import-input"
+                          />
+                        </div>
+                        <button type="submit" className="issue-import-submit" disabled={issueUrlLoading}>
+                          {issueUrlLoading ? "불러오는 중" : "이슈 불러오기"}
+                          {!issueUrlLoading && <Icons.ArrowRight className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                      </form>
+
+                      {issueUrlError && (
+                        <div className="issue-import-error" role="alert">
+                          <Icons.Alert className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>{issueUrlError}</span>
+                        </div>
+                      )}
+
+                      <div className="issue-import-note">
+                        공개 상태이며 라이선스가 확인되는 오픈소스의 GitHub Issue URL을 지원합니다. Pull Request URL은 불러올 수 없습니다. 관심 이슈로 저장하면 마이페이지에서 진행 상태를 관리할 수 있습니다.
+                      </div>
+                    </section>
+
+                    {issueUrlLoading && (
+                      <div className="recommendation-status" role="status">
+                        <span className="recommendation-status-spinner" aria-hidden="true" />
+                        <div>
+                          <strong>GitHub에서 이슈를 불러오고 있습니다.</strong>
+                          <span>이슈 원문과 저장소 정보를 확인한 뒤 상세 화면으로 이동합니다.</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -1471,18 +1577,18 @@ export default function App() {
                     type="button"
                     onClick={() => {
                       setFeatureViewMode('repo-list');
-                      setFeatureSourceMode(
-                        issueData.source === 'github-import' || issueData.source === 'github-repository'
-                          ? 'repository'
-                          : 'recommended'
-                      );
+                      setFeatureSourceMode(issueData.source === 'github-import'
+                        ? 'issue-url'
+                        : issueData.source === 'github-repository' ? 'repository' : 'recommended');
                     }}
                     className="inline-flex items-center gap-1 text-xs text-[#3f6fd9] font-semibold hover:underline"
                   >
                     <Icons.ArrowLeft className="w-3 h-3 text-[#3f6fd9]" />
-                    {issueData.source === 'github-import' || issueData.source === 'github-repository'
-                      ? '저장소 이슈 목록으로 돌아가기'
-                      : '코드 이슈 목록으로 돌아가기'}
+                    {issueData.source === 'github-import'
+                      ? '이슈 URL 입력으로 돌아가기'
+                      : issueData.source === 'github-repository'
+                        ? '저장소 이슈 목록으로 돌아가기'
+                        : '코드 이슈 목록으로 돌아가기'}
                   </button>
                 </div>
 
