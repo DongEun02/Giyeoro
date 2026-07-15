@@ -94,6 +94,13 @@ export const MyPage = ({
                     <span>{item.difficulty}</span>
                     <span>{item.workType}</span>
                     {item.languageTags.slice(0, 2).map(language => <span key={language}>{language}</span>)}
+                    {item.kind === "issue" && (
+                      <span className={(item.data?.assignees?.length || 0) > 0 ? "mypage-assigned" : "mypage-available"}>
+                        {(item.data?.assignees?.length || 0) > 0
+                          ? `담당자 ${item.data.assignees.length}명`
+                          : "담당자 없음"}
+                      </span>
+                    )}
                   </div>
                 </div>
 

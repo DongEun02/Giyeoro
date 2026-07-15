@@ -543,6 +543,7 @@ export default function App() {
   const selectedTranslationDoc = selectedTranslationProject.docs.find(doc => doc.id === selectedDocId)
     || selectedTranslationProject.docs[0];
   const selectedTranslationStatus = translationStatuses[`translation-${selectedRepo}-${selectedTranslationDoc.id}`] || null;
+  const issueAssignees = Array.isArray(issueData?.assignees) ? issueData.assignees : [];
 
   return (
     <>
@@ -1268,6 +1269,14 @@ export default function App() {
                         <span className="contribution-cover-label">
                           {DIFFICULTY_CARD_LABELS[issue.difficultyLevel] || DIFFICULTY_CARD_LABELS.unlabeled}
                         </span>
+                        <span
+                          className={`contribution-assignee-status ${(issue.assignees?.length || 0) > 0 ? "contribution-assignee-status-assigned" : "contribution-assignee-status-available"}`}
+                          title={(issue.assignees?.length || 0) > 0
+                            ? `담당자: ${issue.assignees.map(assignee => assignee.login).join(", ")}`
+                            : "현재 지정된 담당자가 없습니다."}
+                        >
+                          {(issue.assignees?.length || 0) > 0 ? `담당자 ${issue.assignees.length}명` : "담당자 없음"}
+                        </span>
                         <img src={getRepoVisual(issue.repo).image} alt="" />
                         <span className="contribution-cover-kind"><Icons.Code className="w-3.5 h-3.5" /> 코드</span>
                       </div>
@@ -1293,7 +1302,6 @@ export default function App() {
                         <div className="contribution-live-meta">
                           <span>{formatGithubDate(issue.updatedAt)} 업데이트</span>
                           <span>댓글 {issue.comments}개</span>
-                          <span>{issue.assignees.length > 0 ? `담당자 ${issue.assignees.length}명` : "담당자 없음"}</span>
                         </div>
                       </div>
 
@@ -1408,6 +1416,44 @@ export default function App() {
                       </a>
                       <span>{formatGithubDate(issueData.createdAt)} 작성</span>
                       <span>댓글 {issueData.comments}개</span>
+                    </div>
+
+                    <div
+                      className={`issue-assignment-status ${issueAssignees.length > 0 ? "issue-assignment-status-assigned" : "issue-assignment-status-available"}`}
+                      role="status"
+                    >
+                      {issueAssignees.length > 0 ? (
+                        <>
+                          <Icons.Alert className="w-4 h-4 shrink-0" />
+                          <div className="issue-assignment-copy">
+                            <strong>담당자 {issueAssignees.length}명이 지정되어 있습니다.</strong>
+                            <span>이미 작업 중일 수 있으니 중복 기여 여부를 먼저 확인하세요.</span>
+                          </div>
+                          <div className="issue-assignment-people" aria-label="지정된 담당자">
+                            {issueAssignees.map(assignee => (
+                              <a
+                                key={assignee.login}
+                                href={assignee.html_url || `https://github.com/${assignee.login}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {(assignee.avatar_url || assignee.avatarUrl) && (
+                                  <img src={assignee.avatar_url || assignee.avatarUrl} alt="" />
+                                )}
+                                {assignee.login}
+                              </a>
+                            ))}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <Icons.Check className="w-4 h-4 shrink-0" />
+                          <div className="issue-assignment-copy">
+                            <strong>현재 지정된 담당자가 없습니다.</strong>
+                            <span>작업을 시작하기 전에 최신 댓글과 연결된 PR을 확인하세요.</span>
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {issueData.labels.length > 0 && (

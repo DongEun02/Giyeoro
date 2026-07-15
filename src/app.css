@@ -2785,6 +2785,75 @@ body {
   font-size: 11px;
 }
 
+.issue-assignment-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.issue-assignment-status-available {
+  border-color: #cfe4d6;
+  background: #f4faf6;
+  color: #22613a;
+}
+
+.issue-assignment-status-assigned {
+  border-color: #ead9bd;
+  background: #fff9ee;
+  color: #76521a;
+}
+
+.issue-assignment-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.issue-assignment-copy strong {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.issue-assignment-copy span {
+  color: #686868;
+  line-height: 1.55;
+}
+
+.issue-assignment-people {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.issue-assignment-people a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  border: 1px solid #dfceb1;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #5f4318;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.issue-assignment-people img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
 .imported-issue-author {
   display: inline-flex;
   align-items: center;
@@ -3730,6 +3799,16 @@ body {
   color: #c1c1c1;
 }
 
+.mypage-item-meta .mypage-available {
+  color: #267044;
+  font-weight: 750;
+}
+
+.mypage-item-meta .mypage-assigned {
+  color: #80591c;
+  font-weight: 750;
+}
+
 .mypage-item-controls {
   min-width: 0;
 }
@@ -3913,6 +3992,30 @@ body {
   padding: 4px 7px;
   border-radius: 5px;
   background: rgba(23, 23, 23, .72);
+}
+
+.contribution-assignee-status {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 3;
+  padding: 4px 7px;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
+}
+
+.contribution-assignee-status-available {
+  background: rgba(246, 253, 248, .96);
+  color: #22613a;
+}
+
+.contribution-assignee-status-assigned {
+  background: rgba(255, 248, 235, .96);
+  color: #76521a;
 }
 
 .contribution-main {
@@ -4747,6 +4850,16 @@ body {
     gap: 12px;
   }
 
+  .issue-assignment-status {
+    flex-wrap: wrap;
+  }
+
+  .issue-assignment-people {
+    width: 100%;
+    padding-left: 26px;
+    justify-content: flex-start;
+  }
+
   .imported-issue-footer {
     align-items: flex-start;
     flex-direction: column;
@@ -4788,6 +4901,11 @@ body {
   .contribution-cover-kind {
     right: 7px;
     bottom: 7px;
+  }
+
+  .contribution-assignee-status {
+    bottom: 7px;
+    left: 7px;
   }
 
   .contribution-title {
