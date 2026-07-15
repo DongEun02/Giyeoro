@@ -37,7 +37,7 @@ const RELATED_PULL_REQUESTS_QUERY = `
 const DIFFICULTY_PATTERNS = [
   {
     level: "starter",
-    pattern: /good first issue|good-first-issue|beginner|first[- ]timers|difficulty:\s*(easy|starter)|^easy$/i
+    pattern: /good first issue|good-first-issue|beginner|first[- ]timers|low[- ]hanging fruit|difficulty:\s*(easy|starter)|^easy$/i
   },
   {
     level: "medium",
@@ -48,6 +48,19 @@ const DIFFICULTY_PATTERNS = [
     pattern: /difficulty:\s*(hard|advanced|challenging)|^hard$|^advanced$|^challenging$/i
   }
 ];
+
+const ESTIMATED_DIFFICULTY_LABELS = {
+  starter: "예상 첫 기여",
+  medium: "예상 중간",
+  challenging: "예상 도전"
+};
+
+const STARTER_SCOPE_PATTERN = /\b(typo|spelling|wording|readme|documentation|docs?|comment|copy|example|sample|tutorial|localization|translation)\b/i;
+const NARROW_CHANGE_PATTERN = /\b(add|adjust|change|fix|remove|rename|update)\b.{0,50}\b(label|message|text|test|docs?|readme|example|comment|warning)\b/i;
+const COMPLEX_SCOPE_PATTERN = /\b(architecture|compiler|parser|serialization|concurrency|parallel|race condition|deadlock|memory leak|security|authentication|authorization|migration|protocol|distributed|infrastructure|rendering engine|database|cross[- ]platform|breaking change)\b/i;
+const INVESTIGATION_PATTERN = /\b(root cause|investigat(e|ion)|unknown|intermittent|flaky|cannot reproduce|can't reproduce|rfc|proposal|design discussion)\b/i;
+const SMALL_SCOPE_LABEL_PATTERN = /\b(size[:/ -]?(xs|small)|small scope|low risk|easy fix)\b/i;
+const LARGE_SCOPE_LABEL_PATTERN = /\b(size[:/ -]?(large|xl)|complex|epic|needs investigation|high risk)\b/i;
 
 const EXCLUDED_LABEL_PATTERN = /duplicate|invalid|wontfix|won't fix|stale|not planned/i;
 
@@ -83,13 +96,74 @@ const normalizeLabels = labels => (labels || []).map(label => {
   };
 }).filter(label => label.name);
 
-const inferDifficulty = labels => {
+const inferDifficulty = ({ labels, title, body, workType, comments }) => {
   for (const { level, pattern } of DIFFICULTY_PATTERNS) {
     const matchedLabel = labels.find(label => pattern.test(label.name));
-    if (matchedLabel) return { level, label: matchedLabel.name };
+    if (matchedLabel) {
+      return {
+        level,
+        label: matchedLabel.name,
+        source: "repository-label",
+        confidence: "높음",
+        reason: `저장소의 '${matchedLabel.name}' 라벨을 기준으로 분류했습니다.`
+      };
+    }
   }
 
-  return { level: "unlabeled", label: "난이도 미분류" };
+  const labelText = labels.map(label => label.name).join(" ");
+  const issueText = `${title || ""} ${body || ""}`;
+  const reasons = [];
+  let score = 0;
+
+  if (STARTER_SCOPE_PATTERN.test(issueText)) {
+    score -= 3;
+    reasons.push("문서·예제처럼 변경 범위가 비교적 좁음");
+  }
+  if (NARROW_CHANGE_PATTERN.test(issueText)) {
+    score -= 2;
+    reasons.push("수정 대상과 동작이 구체적으로 제시됨");
+  }
+  if (SMALL_SCOPE_LABEL_PATTERN.test(labelText)) {
+    score -= 3;
+    reasons.push("저장소 라벨이 작은 작업 범위를 나타냄");
+  }
+  if (/help wanted|contributions welcome|accepting prs/i.test(labelText)) {
+    score -= 1;
+    reasons.push("외부 기여를 받는 이슈로 표시됨");
+  }
+  if (workType === "문서") score -= 2;
+
+  if (COMPLEX_SCOPE_PATTERN.test(issueText)) {
+    score += 4;
+    reasons.push("시스템 구조나 전문 영역에 영향을 줄 가능성이 큼");
+  }
+  if (INVESTIGATION_PATTERN.test(issueText)) {
+    score += 2;
+    reasons.push("원인 조사나 설계 판단이 선행되어야 함");
+  }
+  if (LARGE_SCOPE_LABEL_PATTERN.test(labelText)) {
+    score += 3;
+    reasons.push("저장소 라벨이 큰 작업 범위를 나타냄");
+  }
+  if (["성능", "리팩터링"].includes(workType)) score += 2;
+  if (workType === "기능 개선") score += 1;
+  if (comments >= 25) {
+    score += 2;
+    reasons.push("논의량이 많아 기존 맥락 확인이 필요함");
+  } else if (comments >= 10) {
+    score += 1;
+    reasons.push("관련 논의를 먼저 확인해야 함");
+  }
+
+  const level = score <= -2 ? "starter" : score >= 4 ? "challenging" : "medium";
+  const confidence = Math.abs(score) >= 4 ? "중간" : "낮음";
+  return {
+    level,
+    label: ESTIMATED_DIFFICULTY_LABELS[level],
+    source: "estimated",
+    confidence,
+    reason: `${reasons.slice(0, 2).join(" · ") || "이슈 본문에서 뚜렷한 난이도 신호가 적어 일반적인 작업 범위로 판단"}.`
+  };
 };
 
 const inferWorkType = (labels, title) => {
@@ -201,13 +275,19 @@ const toPublicRecommendation = issue => {
 
 const toRecommendation = (rawIssue, repository, source = "github-recommendation") => {
   const labels = normalizeLabels(rawIssue.labels);
-  const difficulty = inferDifficulty(labels);
   const workType = inferWorkType(labels, rawIssue.title || "");
   const visibleLabels = labels
     .map(label => label.name)
     .filter(name => !/^status:|^linear:|difficulty:/i.test(name))
     .slice(0, 3);
   const body = (rawIssue.body || "").slice(0, 60_000);
+  const difficulty = inferDifficulty({
+    labels,
+    title: rawIssue.title || "",
+    body,
+    workType,
+    comments: rawIssue.comments || 0
+  });
   const fallbackTechs = [repository.name, ...(repository.topics || [])].filter(Boolean);
 
   const recommendation = {
@@ -223,6 +303,9 @@ const toRecommendation = (rawIssue, repository, source = "github-recommendation"
     status: rawIssue.state === "open" ? "Open" : "Closed",
     difficulty: difficulty.label,
     difficultyLevel: difficulty.level,
+    difficultySource: difficulty.source,
+    difficultyConfidence: difficulty.confidence,
+    difficultyReason: difficulty.reason,
     workType,
     typeLabel: workType,
     languageTags: repository.languageTags,

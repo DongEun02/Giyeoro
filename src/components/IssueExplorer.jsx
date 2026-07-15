@@ -24,7 +24,7 @@ export const IssueFilters = ({
     <div className="soft-divider pt-3 border-t space-y-2">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider block">난이도</span>
-        <span className="text-[10px] text-[#6e7781]">저장소 라벨 기준</span>
+        <span className="text-[10px] text-[#6e7781]">저장소 라벨 우선 · 자동 추정</span>
       </div>
       <div className="flex items-center gap-1.5 flex-wrap">
         {DIFFICULTY_FILTERS.map(({ value, label }) => (
@@ -108,7 +108,12 @@ export const IssueRecommendationGrid = ({
           <h3 className="contribution-title">{issue.titleKo || issue.title}</h3>
           <p className="contribution-summary">{issue.summaryKo || issue.summary}</p>
           <div className="contribution-meta">
-            <span className="contribution-chip contribution-chip-accent">{issue.difficulty}</span>
+            <span
+              className="contribution-chip contribution-chip-accent"
+              title={`${issue.difficultySource === "repository-label" ? "저장소 라벨" : `자동 추정 · 신뢰도 ${issue.difficultyConfidence || "낮음"}`} · ${issue.difficultyReason || "판정 근거 없음"}`}
+            >
+              {issue.difficulty}
+            </span>
             <span className="contribution-chip">{issue.typeLabel}</span>
             {(issue.languageTags || []).map(language => (
               <span key={`${issue.id}-${language}`} className="contribution-chip">{language}</span>
