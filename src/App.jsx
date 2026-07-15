@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { BrandMark, SITE_ICON_DATA_URL } from "./components/BrandMark.jsx";
 import { Icons, PRStatusBadge } from "./components/Icons.jsx";
 import { IssueFilters, IssueRecommendationGrid } from "./components/IssueExplorer.jsx";
+import { LanguageFilterBar } from "./components/LanguageFilterBar.jsx";
 import { MyPage } from "./components/MyPage.jsx";
 import { usePersistentState } from "./hooks/usePersistentState.js";
 import {
