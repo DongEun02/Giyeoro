@@ -83,6 +83,37 @@ const githubHeaders = githubToken => {
   return headers;
 };
 
+const resolveRepositoryLicense = async (repository, githubToken) => {
+  const detectedId = repository.license?.spdx_id || "";
+  if (!EXCLUDED_LICENSES.has(detectedId)) {
+    return {
+      id: detectedId,
+      name: repository.license?.name || detectedId,
+      url: repository.license?.url || ""
+    };
+  }
+
+  const response = await fetch(`https://api.github.com/repos/${repository.full_name}/license`, {
+    headers: githubHeaders(githubToken),
+    signal: AbortSignal.timeout(20_000)
+  });
+  if (response.status === 403 || response.status === 429) throw new Error("GITHUB_RATE_LIMIT");
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error("GITHUB_FETCH_FAILED");
+
+  const licenseFile = await response.json();
+  if (!licenseFile?.html_url) return null;
+
+  const licenseId = licenseFile.license?.spdx_id || detectedId;
+  return {
+    id: EXCLUDED_LICENSES.has(licenseId) ? "CUSTOM" : licenseId,
+    name: EXCLUDED_LICENSES.has(licenseId)
+      ? "라이선스 파일 확인됨"
+      : licenseFile.license?.name || licenseId,
+    url: licenseFile.html_url
+  };
+};
+
 const median = values => {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -318,13 +349,15 @@ export const fetchOpenSourceRepository = async (fullName, githubToken) => {
   if (!response.ok) throw new Error("GITHUB_FETCH_FAILED");
 
   const repository = await response.json();
-  const licenseId = repository.license?.spdx_id || "";
-  if (repository.visibility !== "public" || EXCLUDED_LICENSES.has(licenseId)) {
+  if (repository.visibility !== "public") {
     throw new Error("REPOSITORY_NOT_OPEN_SOURCE");
   }
   if (repository.archived || repository.disabled) {
     throw new Error("REPOSITORY_INACTIVE");
   }
+
+  const license = await resolveRepositoryLicense(repository, githubToken);
+  if (!license) throw new Error("REPOSITORY_NOT_OPEN_SOURCE");
 
   let contributionGuideUrl = "";
   let contributionGuideApiUrl = "";
@@ -356,10 +389,7 @@ export const fetchOpenSourceRepository = async (fullName, githubToken) => {
     forks: repository.forks_count || 0,
     openIssues: repository.open_issues_count || 0,
     hasIssues: !!repository.has_issues,
-    license: {
-      id: licenseId,
-      name: repository.license?.name || licenseId
-    },
+    license,
     ownerAvatarUrl: repository.owner?.avatar_url || "",
     activity: repositoryActivity(repository.pushed_at),
     pushedAt: repository.pushed_at || null,

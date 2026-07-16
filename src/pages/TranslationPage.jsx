@@ -76,7 +76,11 @@ export function TranslationPage() {
               />
             </div>
             <div className="text-xs text-[#57606a] font-medium">
-              총 <span className="text-[#3f6fd9] font-bold">{filteredTranslationTasks.length}개</span>의 추천 작업
+              {translationStatusLoading || !translationStatusLoaded ? (
+                <span className="text-[#3f6fd9] font-bold">추천 작업 확인 중</span>
+              ) : (
+                <>총 <span className="text-[#3f6fd9] font-bold">{filteredTranslationTasks.length}개</span>의 추천 작업</>
+              )}
             </div>
           </div>
 
@@ -119,8 +123,9 @@ export function TranslationPage() {
             </div>
           )}
 
-          <div className="contribution-list">
-            {filteredTranslationTasks.length > 0 ? filteredTranslationTasks.map(task => (
+          {translationStatusLoaded && !translationStatusLoading && !translationStatusError && (
+            <div className="contribution-list">
+              {filteredTranslationTasks.length > 0 ? filteredTranslationTasks.map(task => (
               <article
                 key={task.id}
                 className="contribution-item"
@@ -167,10 +172,11 @@ export function TranslationPage() {
                   <Icons.Bookmark filled={!!interestedTasks[task.id]} className="w-4 h-4" />
                 </button>
               </article>
-            )) : (
-              <div className="empty-list">현재 조건에 맞는 번역 작업이 없습니다.</div>
-            )}
-          </div>
+              )) : (
+                <div className="empty-list">현재 조건에 맞는 번역 작업이 없습니다.</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

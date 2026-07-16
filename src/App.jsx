@@ -293,6 +293,11 @@ export default function App() {
 
   const refreshTranslationStatuses = () => {
     clearTranslationStatusCache();
+    setTranslationStatuses({});
+    setTranslationStatusGeneratedAt("");
+    setTranslationStatusStale(false);
+    setTranslationStatusError("");
+    setTranslationStatusLoading(true);
     setTranslationStatusLoaded(false);
     setTranslationStatusRefreshVersion(version => version + 1);
   };
@@ -612,18 +617,19 @@ export default function App() {
     }
   };
 
-  const liveTranslationTasks = TRANSLATION_TASKS
-    .map(task => {
-      const liveStatus = translationStatuses[task.id];
-      return {
-        ...task,
-        status: liveStatus?.status || "checking",
-        statusText: liveStatus?.statusText || "상태 확인 중",
-        summary: liveStatus?.summary || task.summary,
-        difficulty: liveStatus?.statusText || "상태 확인 중"
-      };
-    })
-    .filter(task => !translationStatusLoaded || task.status !== "completed");
+  const liveTranslationTasks = translationStatusLoaded && !translationStatusError
+    ? TRANSLATION_TASKS.flatMap(task => {
+        const liveStatus = translationStatuses[task.id];
+        if (!liveStatus || liveStatus.status === "completed") return [];
+        return [{
+          ...task,
+          status: liveStatus.status,
+          statusText: liveStatus.statusText,
+          summary: liveStatus.summary,
+          difficulty: liveStatus.statusText
+        }];
+      })
+    : [];
 
   const filteredTranslationTasks = liveTranslationTasks.filter(task => {
     const query = translationSearch.trim().toLowerCase();
