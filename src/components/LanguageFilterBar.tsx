@@ -17,6 +17,7 @@ export const LanguageFilterBar = ({
         <button
           key={language}
           type="button"
+          aria-pressed={selectedLanguage === language}
           onClick={() => onChange(language)}
           className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-all ${
             selectedLanguage === language

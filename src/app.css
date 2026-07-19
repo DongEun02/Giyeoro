@@ -4163,6 +4163,21 @@ body {
   background: transparent;
 }
 
+.contribution-card-link {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.contribution-card-link:focus-visible {
+  outline: 2px solid #3366ff;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
 .contribution-cover {
   position: relative;
   width: 100%;
@@ -4408,6 +4423,76 @@ body {
   font-weight: 750;
 }
 
+.translation-project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.translation-project-card {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid #e1e2e3;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.translation-project-card > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.translation-project-card strong {
+  overflow: hidden;
+  color: #24292f;
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.translation-project-card span {
+  color: #6e7781;
+  font-size: 10px;
+}
+
+.translation-project-card a {
+  width: fit-content;
+  color: #3366ff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.translation-project-card a:hover {
+  text-decoration: underline;
+}
+
+.translation-project-card em {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eef8f1;
+  color: #1b7f43;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.translation-project-card em.is-actionable {
+  background: #fff6dd;
+  color: #9a6700;
+}
+
+.translation-project-card em.is-review {
+  background: #f1f2f4;
+  color: #6e7781;
+}
+
 .translation-status-refresh {
   display: inline-flex;
   align-items: center;
@@ -4433,6 +4518,10 @@ body {
 
 .translation-task-status-checking {
   color: #777777;
+}
+
+.translation-task-status-review {
+  color: #6e7781;
 }
 
 .translation-detail-status {

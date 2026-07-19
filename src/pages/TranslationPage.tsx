@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useOssApp } from "../app/OssAppContext";
 import { Icons } from "../components/Icons";
 import { LanguageFilterBar } from "../components/LanguageFilterBar";
-import { formatGithubDate, getRepoVisual, TRANSLATION_PROJECTS } from "../data/content";
+import { formatGithubDate, getRepoVisual } from "../data/content";
 
 export function TranslationPage() {
   const navigate = useNavigate();
@@ -19,11 +19,13 @@ export function TranslationPage() {
     setTranslationQuery,
     translationLanguage,
     setTranslationLanguage,
+    translationProjects,
     translationStatuses,
     translationStatusLoading,
     translationStatusLoaded,
     translationStatusError,
     translationStatusStale,
+    translationDiscoverySummary,
     bookmarks,
     interestedTasks,
     refreshTranslationStatuses,
@@ -38,8 +40,8 @@ export function TranslationPage() {
   const isDetail = !!repoKey && !!docId;
 
   useEffect(() => {
-    if (!isDetail) return;
-    const project = TRANSLATION_PROJECTS[repoKey];
+    if (!isDetail || !translationStatusLoaded || translationStatusError) return;
+    const project = translationProjects[repoKey];
     if (!project) {
       navigate("/translations", { replace: true });
       return;
@@ -51,7 +53,30 @@ export function TranslationPage() {
     }
     setSelectedRepo(repoKey);
     setSelectedDocId(docId);
-  }, [docId, isDetail, navigate, repoKey, setSelectedDocId, setSelectedRepo]);
+  }, [
+    docId,
+    isDetail,
+    navigate,
+    repoKey,
+    setSelectedDocId,
+    setSelectedRepo,
+    translationProjects,
+    translationStatusError,
+    translationStatusLoaded
+  ]);
+
+  if (isDetail && (!selectedTranslationProject || !selectedTranslationDoc)) {
+    return (
+      <div className="recommendation-status" role="status">
+        {translationStatusLoading && <span className="recommendation-status-spinner" aria-hidden="true" />}
+        <div>
+          <strong>{translationStatusError ? "번역 문서를 불러오지 못했습니다." : "번역 문서를 불러오고 있습니다."}</strong>
+          <span>{translationStatusError || "선택한 언어의 최신 문서 탐색 결과를 확인합니다."}</span>
+        </div>
+        <button type="button" className="translation-status-refresh" onClick={() => navigate("/translations")}>목록으로</button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -87,14 +112,15 @@ export function TranslationPage() {
           <div className="filter-panel p-3 space-y-2">
             <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider">언어 필터</span>
             <LanguageFilterBar selectedLanguage={translationLanguage} onChange={setTranslationLanguage} />
+            <p className="text-[11px] text-[#6e7781]">언어를 선택하면 검증된 한국어 번역 저장소에서 최근 변경된 문서를 탐색합니다.</p>
           </div>
 
           {translationStatusLoading && (
             <div className="recommendation-status" role="status">
               <span className="recommendation-status-spinner" aria-hidden="true" />
               <div>
-                <strong>실제 문서의 번역 상태를 확인하고 있습니다.</strong>
-                <span>GitHub의 영문 원문과 한국어 문서를 가져와 의미상 차이를 비교합니다.</span>
+                <strong>{translationLanguage === "All" ? "전체 언어" : translationLanguage} 번역 문서를 찾고 있습니다.</strong>
+                <span>검증된 GitHub 저장소의 최근 영문 변경과 한국어 문서를 비교합니다.</span>
               </div>
             </div>
           )}
@@ -114,13 +140,48 @@ export function TranslationPage() {
           )}
 
           {translationStatusLoaded && !translationStatusError && !translationStatusLoading && (
-            <div className="translation-live-status">
-              <span><i aria-hidden="true" />{translationStatusStale ? "캐시된 비교 결과" : "GitHub 문서 비교 완료"} · {translationStatusGeneratedAtText}</span>
-              <button type="button" onClick={refreshTranslationStatuses} title="번역 상태 새로고침">
-                <Icons.Refresh className="w-3.5 h-3.5" />
-                <span>새로고침</span>
-              </button>
-            </div>
+            <>
+              <div className="translation-live-status">
+                <span>
+                  <i aria-hidden="true" />
+                  {translationStatusStale ? "캐시된 탐색 결과" : "GitHub 문서 탐색 완료"}
+                  {` · 프로젝트 ${translationDiscoverySummary.projectCount}개 · 최근 변경 문서 ${translationDiscoverySummary.checkedDocumentCount}개 · ${translationStatusGeneratedAtText}`}
+                </span>
+                <button type="button" onClick={refreshTranslationStatuses} title="번역 문서 새로고침">
+                  <Icons.Refresh className="w-3.5 h-3.5" />
+                  <span>새로고침</span>
+                </button>
+              </div>
+
+              {translationDiscoverySummary.failedProjects.length > 0 && (
+                <div className="recommendation-status recommendation-status-error" role="status">
+                  <Icons.Alert className="w-4 h-4 shrink-0" />
+                  <div>
+                    <strong>일부 번역 저장소를 확인하지 못했습니다.</strong>
+                    <span>{translationDiscoverySummary.failedProjects.map((project: any) => project.name).join(", ")}</span>
+                  </div>
+                </div>
+              )}
+
+              {Object.values(translationProjects).length > 0 && (
+                <div className="translation-project-grid" aria-label="탐색한 번역 프로젝트">
+                  {Object.values(translationProjects).map((project: any) => (
+                    <div className="translation-project-card" key={project.key}>
+                      <div>
+                        <strong>{project.name}</strong>
+                        <span>최근 변경 문서 {project.checkedDocumentCount}개 확인</span>
+                        <a href={project.contributionGuideUrl} target="_blank" rel="noreferrer">기여 안내 보기</a>
+                      </div>
+                      <em className={project.actionableCount > 0 ? "is-actionable" : project.reviewCount > 0 ? "is-review" : ""}>
+                        {project.actionableCount > 0
+                          ? `기여 가능 ${project.actionableCount}건`
+                          : project.reviewCount > 0 ? `비교 보류 ${project.reviewCount}건` : "현재 최신 상태"}
+                      </em>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {translationStatusLoaded && !translationStatusLoading && !translationStatusError && (
@@ -129,8 +190,13 @@ export function TranslationPage() {
               <article
                 key={task.id}
                 className="contribution-item"
-                onClick={() => navigate(`/translations/${task.repoKey}/${task.docId}`)}
               >
+                <button
+                  type="button"
+                  className="contribution-card-link"
+                  aria-label={`${task.title} 상세 보기`}
+                  onClick={() => navigate(`/translations/${task.repoKey}/${task.docId}`)}
+                />
                 <div
                   className="contribution-cover"
                   style={{ background: getRepoVisual(task.repo).background }}
@@ -173,7 +239,17 @@ export function TranslationPage() {
                 </button>
               </article>
               )) : (
-                <div className="empty-list">현재 조건에 맞는 번역 작업이 없습니다.</div>
+                <div className="empty-list">
+                  {translationDiscoverySummary.projectCount === 0
+                    ? `현재 ${translationLanguage === "All" ? "선택 가능한 언어" : translationLanguage}에서 검증된 한국어 번역 프로젝트가 없습니다.`
+                    : translationDiscoverySummary.checkedDocumentCount === 0
+                      ? "등록된 번역 프로젝트에서 최근 변경된 문서를 찾지 못했습니다."
+                      : translationDiscoverySummary.actionableCount > 0
+                        ? "현재 검색 조건에 맞는 번역 작업이 없습니다."
+                        : translationDiscoverySummary.reviewCount > 0
+                          ? "일부 문서는 자동 비교를 완료하지 못해 추천 작업에서 제외했습니다."
+                      : "확인한 최근 변경 문서는 모두 한국어 문서에 반영되어 있습니다."}
+                </div>
               )}
             </div>
           )}
@@ -299,11 +375,15 @@ export function TranslationPage() {
                       </a>
                       <a href={selectedTranslationStatus.translation.url} target="_blank" rel="noreferrer">
                         <div>
-                          <span>한국어 번역본</span>
+                          <span>{selectedTranslationStatus.translation.exists ? "한국어 번역본" : "생성할 한국어 문서"}</span>
                           <strong>{selectedTranslationStatus.translation.repo}</strong>
                           <code>{selectedTranslationStatus.translation.path}</code>
                         </div>
-                        <em>{formatGithubDate(selectedTranslationStatus.translation.committedAt)} · {selectedTranslationStatus.translation.commitSha.slice(0, 7)}</em>
+                        <em>
+                          {selectedTranslationStatus.translation.exists
+                            ? `${formatGithubDate(selectedTranslationStatus.translation.committedAt)} · ${selectedTranslationStatus.translation.commitSha.slice(0, 7)}`
+                            : "아직 한국어 파일 없음"}
+                        </em>
                         <Icons.ArrowRight className="w-3.5 h-3.5" />
                       </a>
                     </div>

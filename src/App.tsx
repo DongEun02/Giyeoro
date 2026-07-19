@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { OssAppProvider } from "./app/OssAppContext";
 import { BrandMark, SITE_ICON_DATA_URL } from "./components/BrandMark";
 import { Icons } from "./components/Icons";
 import { usePersistentState } from "./hooks/usePersistentState";
 import {
-  TRANSLATION_PROJECTS,
-  TRANSLATION_TASKS,
   matchesLanguage
 } from "./data/content";
 import { CodeIssuesPage } from "./pages/CodeIssuesPage";
@@ -22,6 +20,7 @@ import { fetchTrendingRepositories } from "./services/trendingRepositories";
 import {
   clearTranslationStatusCache,
   fetchTranslationStatuses,
+  indexTranslationProjects,
   indexTranslationStatuses
 } from "./services/translationStatus";
 import { createWorkspaceItem, WORKSPACE_STATUSES } from "./services/userWorkspace";
@@ -54,6 +53,7 @@ export default function App() {
   });
   const [translationSearch, setTranslationQuery] = useState("");
   const [translationLanguage, setTranslationLanguage] = useState("All");
+  const [translationProjects, setTranslationProjects] = useState<Record<string, any>>({});
   const [translationStatuses, setTranslationStatuses] = useState<Record<string, any>>({});
   const [translationStatusLoading, setTranslationStatusLoading] = useState(false);
   const [translationStatusLoaded, setTranslationStatusLoaded] = useState(false);
@@ -61,6 +61,14 @@ export default function App() {
   const [translationStatusGeneratedAt, setTranslationStatusGeneratedAt] = useState("");
   const [translationStatusStale, setTranslationStatusStale] = useState(false);
   const [translationStatusRefreshVersion, setTranslationStatusRefreshVersion] = useState(0);
+  const [translationDiscoverySummary, setTranslationDiscoverySummary] = useState({
+    projectCount: 0,
+    checkedDocumentCount: 0,
+    actionableCount: 0,
+    reviewCount: 0,
+    failedProjects: [] as Array<{ key: string; name: string }>
+  });
+  const handledTranslationRefresh = useRef(0);
 
   const [issueData, setIssueData] = useState(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState("All");
@@ -255,22 +263,36 @@ export default function App() {
   }, [view, guideSourceMode, guideRepoKey, guideDetailRefreshVersion]);
 
   useEffect(() => {
-    if (view !== 'translation' || translationStatusLoaded) return undefined;
+    if (view !== 'translation') return undefined;
 
     const controller = new AbortController();
-    const requestTimeout = setTimeout(() => controller.abort(), 45_000);
+    const requestTimeout = setTimeout(() => controller.abort(), 100_000);
     let active = true;
+    const force = translationStatusRefreshVersion > handledTranslationRefresh.current;
+    handledTranslationRefresh.current = translationStatusRefreshVersion;
     setTranslationStatusLoading(true);
+    setTranslationStatusLoaded(false);
     setTranslationStatusError("");
+    setTranslationStatuses({});
+    setTranslationProjects({});
 
     fetchTranslationStatuses({
-      force: translationStatusRefreshVersion > 0,
+      language: translationLanguage,
+      force,
       signal: controller.signal
     })
       .then(result => {
         if (!active) return;
         clearTimeout(requestTimeout);
         setTranslationStatuses(indexTranslationStatuses(result));
+        setTranslationProjects(indexTranslationProjects(result));
+        setTranslationDiscoverySummary({
+          projectCount: result.projectCount || 0,
+          checkedDocumentCount: result.checkedDocumentCount || 0,
+          actionableCount: result.actionableCount || 0,
+          reviewCount: result.reviewCount || 0,
+          failedProjects: result.failedProjects || []
+        });
         setTranslationStatusGeneratedAt(result.generatedAt || "");
         setTranslationStatusStale(!!result.stale);
         setTranslationStatusLoading(false);
@@ -293,10 +315,11 @@ export default function App() {
       clearTimeout(requestTimeout);
       controller.abort();
     };
-  }, [view, translationStatusRefreshVersion]);
+  }, [view, translationLanguage, translationStatusRefreshVersion]);
 
   const refreshTranslationStatuses = () => {
-    clearTranslationStatusCache();
+    clearTranslationStatusCache(translationLanguage);
+    setTranslationProjects({});
     setTranslationStatuses({});
     setTranslationStatusGeneratedAt("");
     setTranslationStatusStale(false);
@@ -520,14 +543,11 @@ export default function App() {
 
   const openWorkspaceItem = (item: any) => {
     if (item.kind === "translation") {
-      const projectKey = TRANSLATION_PROJECTS[item.data.repoKey] ? item.data.repoKey : "react";
-      const project = TRANSLATION_PROJECTS[projectKey];
-      const documentId = project.docs.some((document: any) => document.id === item.data.docId)
-        ? item.data.docId
-        : project.docs[0].id;
-      setSelectedRepo(projectKey);
-      setSelectedDocId(documentId);
-      navigate(`/translations/${projectKey}/${documentId}`);
+      const language = item.languageTags?.[0] || "All";
+      setTranslationLanguage(language);
+      setSelectedRepo(item.data.repoKey);
+      setSelectedDocId(item.data.docId);
+      navigate(`/translations/${item.data.repoKey}/${item.data.docId}`);
       return;
     }
 
@@ -622,17 +642,24 @@ export default function App() {
   };
 
   const liveTranslationTasks = translationStatusLoaded && !translationStatusError
-    ? TRANSLATION_TASKS.flatMap(task => {
-        const liveStatus = translationStatuses[task.id];
-        if (!liveStatus || liveStatus.status === "completed") return [];
-        return [{
-          ...task,
-          status: liveStatus.status,
-          statusText: liveStatus.statusText,
-          summary: liveStatus.summary,
-          difficulty: liveStatus.statusText
-        }];
-      })
+    ? Object.values(translationProjects).flatMap((project: any) => (
+        (project.docs || []).flatMap((document: any) => {
+          if (!["alert", "partial"].includes(document.status)) return [];
+          return [{
+            id: `translation-${project.key}-${document.id}`,
+            repoKey: project.key,
+            docId: document.id,
+            repo: project.name,
+            title: `${document.title} 한국어 번역 업데이트`,
+            summary: document.summary,
+            difficulty: document.statusText,
+            status: document.status,
+            statusText: document.statusText,
+            languageTags: document.languageTags || project.languageTags || [],
+            techs: (project.techStack || []).slice(0, 2)
+          }];
+        })
+      ))
     : [];
 
   const filteredTranslationTasks = liveTranslationTasks.filter(task => {
@@ -690,10 +717,13 @@ export default function App() {
         minute: '2-digit'
       }).format(new Date(translationStatusGeneratedAt))
     : '';
-  const selectedTranslationProject = TRANSLATION_PROJECTS[selectedRepo] || TRANSLATION_PROJECTS.react;
-  const selectedTranslationDoc = selectedTranslationProject.docs.find((doc: any) => doc.id === selectedDocId)
-    || selectedTranslationProject.docs[0];
-  const selectedTranslationStatus = translationStatuses[`translation-${selectedRepo}-${selectedTranslationDoc.id}`] || null;
+  const selectedTranslationProject = translationProjects[selectedRepo] || null;
+  const selectedTranslationDoc = selectedTranslationProject?.docs.find((doc: any) => doc.id === selectedDocId)
+    || selectedTranslationProject?.docs[0]
+    || null;
+  const selectedTranslationStatus = selectedTranslationDoc
+    ? translationStatuses[`translation-${selectedRepo}-${selectedTranslationDoc.id}`] || null
+    : null;
   const issueAssignees = Array.isArray(issueData?.assignees) ? issueData.assignees : [];
 
   const appContextValue = {
@@ -713,11 +743,13 @@ export default function App() {
     setTranslationQuery,
     translationLanguage,
     setTranslationLanguage,
+    translationProjects,
     translationStatuses,
     translationStatusLoading,
     translationStatusLoaded,
     translationStatusError,
     translationStatusStale,
+    translationDiscoverySummary,
     bookmarks,
     interestedTasks,
     refreshTranslationStatuses,

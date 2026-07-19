@@ -1,9 +1,11 @@
-const CACHE_KEY = "oss:translation-status:v1";
+const CACHE_KEY_PREFIX = "oss:translation-status:v2";
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
-const readCache = () => {
+const cacheKey = (language: string) => `${CACHE_KEY_PREFIX}:${language}`;
+
+const readCache = (language: string) => {
   try {
-    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    const cached = JSON.parse(localStorage.getItem(cacheKey(language)) || "null");
     if (!cached?.savedAt || !cached?.value) return null;
     if (Date.now() - cached.savedAt > CACHE_TTL_MS) return null;
     return cached.value;
@@ -12,31 +14,43 @@ const readCache = () => {
   }
 };
 
-const writeCache = (value: any) => {
+const writeCache = (language: string, value: any) => {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), value }));
+    localStorage.setItem(cacheKey(language), JSON.stringify({ savedAt: Date.now(), value }));
   } catch {
     // Storage can be unavailable in private or restricted browser contexts.
   }
 };
 
-export const clearTranslationStatusCache = () => {
+export const clearTranslationStatusCache = (language?: string) => {
   try {
-    localStorage.removeItem(CACHE_KEY);
+    if (language) {
+      localStorage.removeItem(cacheKey(language));
+      return;
+    }
+    Object.keys(localStorage)
+      .filter(key => key.startsWith(CACHE_KEY_PREFIX))
+      .forEach(key => localStorage.removeItem(key));
   } catch {
     // Ignore storage access failures and continue with a network refresh.
   }
 };
 
 export const fetchTranslationStatuses = async (
-  { force = false, signal }: { force?: boolean; signal?: AbortSignal } = {}
+  {
+    language = "All",
+    force = false,
+    signal
+  }: { language?: string; force?: boolean; signal?: AbortSignal } = {}
 ) => {
   if (!force) {
-    const cached = readCache();
+    const cached = readCache(language);
     if (cached) return { ...cached, browserCached: true };
   }
 
-  const response = await fetch(`/api/translation-status${force ? "?refresh=1" : ""}`, {
+  const query = new URLSearchParams({ language });
+  if (force) query.set("refresh", "1");
+  const response = await fetch(`/api/translation-status?${query}`, {
     method: "GET",
     headers: { Accept: "application/json" },
     signal
@@ -44,7 +58,7 @@ export const fetchTranslationStatuses = async (
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || "번역 상태를 확인하지 못했습니다.");
 
-  writeCache(data);
+  writeCache(language, data);
   return data;
 };
 
@@ -54,6 +68,14 @@ export const indexTranslationStatuses = (result: any) => {
     (project.docs || []).forEach((document: any) => {
       index[`translation-${project.key}-${document.id}`] = document;
     });
+  });
+  return index;
+};
+
+export const indexTranslationProjects = (result: any) => {
+  const index: Record<string, any> = {};
+  (result?.projects || []).forEach((project: any) => {
+    index[project.key] = project;
   });
   return index;
 };

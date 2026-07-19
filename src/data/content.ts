@@ -1,6 +1,4 @@
-import { TRANSLATION_PROJECTS } from "../../shared/translationSources";
-
-export { TRANSLATION_PROJECTS } from "../../shared/translationSources";
+import { TRANSLATION_LANGUAGES } from "../../shared/translationSources";
 
 export const TRANSLATION_PRESETS = {
   tanstack: {
@@ -337,22 +335,7 @@ export const FEATURE_RECOMMENDATIONS = [
   }
 ];
 
-export const TRANSLATION_TASKS = Object.entries(TRANSLATION_PROJECTS).flatMap(([repoKey, repo]) =>
-  repo.docs
-    .map(doc => ({
-      id: `translation-${repoKey}-${doc.id}`,
-      repoKey,
-      docId: doc.id,
-      repo: repo.name,
-      title: `${doc.title} 한국어 번역 업데이트`,
-      summary: "실제 GitHub 영문 원문과 한국어 문서를 비교해 최신 번역 상태를 확인합니다.",
-      difficulty: "Beginner",
-      languageTags: repo.languageTags,
-      techs: repo.techStack.slice(0, 2)
-    }))
-);
-
-export const LANGUAGE_FILTERS = ["All", "JavaScript", "TypeScript", "HTML/CSS", "Python", "Java", "Kotlin", "Swift", "Go", "Rust"];
+export const LANGUAGE_FILTERS = [...TRANSLATION_LANGUAGES];
 
 export const DIFFICULTY_FILTERS = [
   { value: "All", label: "전체 난이도" },
@@ -380,7 +363,9 @@ export const REPO_VISUALS: Record<string, { image: string; background: string }>
   "vercel/next.js": { image: "https://github.com/vercel.png?size=320", background: "#f0f1f3" },
   "React 한국어 문서": { image: "https://github.com/reactjs.png?size=320", background: "#eef8fb" },
   "MDN 한국어 문서": { image: "https://github.com/mdn.png?size=320", background: "#f2f4fb" },
-  "Vue 한국어 문서": { image: "https://github.com/vuejs.png?size=320", background: "#edf8f3" }
+  "Vue 한국어 문서": { image: "https://github.com/vuejs.png?size=320", background: "#edf8f3" },
+  "Python 한국어 문서": { image: "https://github.com/python.png?size=320", background: "#fff8e8" },
+  "Rust Book 한국어 문서": { image: "https://github.com/rust-lang.png?size=320", background: "#f8f1eb" }
 };
 
 export const getRepoVisual = (repoName: any) => REPO_VISUALS[repoName] || {
