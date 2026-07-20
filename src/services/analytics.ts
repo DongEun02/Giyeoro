@@ -32,8 +32,8 @@ export const initializeAnalytics = () => {
 
   initialized = true;
   window.dataLayer = window.dataLayer || [];
-  window.gtag = (...args: unknown[]) => {
-    window.dataLayer?.push(args);
+  window.gtag = function gtag(..._args: unknown[]) {
+    window.dataLayer?.push(arguments);
   };
 
   const script = document.createElement("script");
