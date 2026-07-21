@@ -60,7 +60,7 @@ export const MyPage = ({
           </a>
           <div>
             <strong>{user.name}</strong>
-            <span>@{user.login} · 이 브라우저에 저장된 작업 기준</span>
+            <span>@{user.login} · GitHub 계정에 저장된 작업 기준</span>
           </div>
         </div>
 

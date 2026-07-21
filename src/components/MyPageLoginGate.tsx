@@ -29,7 +29,7 @@ export function MyPageLoginGate({ loading }: MyPageLoginGateProps) {
       <a href={getGithubLoginUrl("/mypage")} className="mypage-login-button">
         <Icons.Github className="w-4 h-4" /> GitHub로 로그인
       </a>
-      <small>현재 작업 목록은 이 브라우저에 저장되며 계정 간 동기화는 아직 지원하지 않습니다.</small>
+      <small>로그인하면 관심 이슈와 진행 상태가 계정에 안전하게 저장되어 다른 기기에서도 이어집니다.</small>
     </section>
   );
 }

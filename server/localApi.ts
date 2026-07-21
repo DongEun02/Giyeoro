@@ -12,6 +12,7 @@ import {
   handleGithubSessionRequest
 } from "./githubAuthService.js";
 import { handlePersonalizedRepositoriesRequest } from "./personalizedRepositoryService.js";
+import { handleWorkspaceRequest } from "./workspaceService.js";
 
 export const localApiPlugin = (options: any) => ({
   name: "giyeoro-local-api",
@@ -35,6 +36,9 @@ export const localApiPlugin = (options: any) => ({
     ));
     server.middlewares.use("/api/personalized-repositories", (request: any, response: any) => (
       handlePersonalizedRepositoriesRequest(request, response, authOptions)
+    ));
+    server.middlewares.use("/api/workspace", (request: any, response: any) => (
+      handleWorkspaceRequest(request, response, authOptions)
     ));
     server.middlewares.use("/api/analyze-issue", (request: any, response: any) => (
       handleAnalyzeIssueRequest(request, response, {

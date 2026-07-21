@@ -17,7 +17,8 @@ export default defineConfig(({ mode }) => {
         clientId: env.GITHUB_OAUTH_CLIENT_ID,
         clientSecret: env.GITHUB_OAUTH_CLIENT_SECRET,
         sessionSecret: env.AUTH_SESSION_SECRET,
-        appUrl: env.APP_URL
+        appUrl: env.APP_URL,
+        databaseUrl: env.DATABASE_URL
       })
     ],
     server: {

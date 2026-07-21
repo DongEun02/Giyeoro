@@ -26,8 +26,21 @@ import {
   indexTranslationProjects,
   indexTranslationStatuses
 } from "./services/translationStatus";
-import { createWorkspaceItem, WORKSPACE_STATUSES } from "./services/userWorkspace";
+import {
+  clearLegacyWorkspaceItems,
+  createWorkspaceItem,
+  indexWorkspaceItems,
+  readLegacyWorkspaceItems,
+  WORKSPACE_STATUSES,
+  writeLegacyWorkspaceItems
+} from "./services/userWorkspace";
 import type { WorkspaceItem } from "./services/userWorkspace";
+import {
+  deleteRemoteWorkspaceItem,
+  syncWorkspaceItems,
+  updateRemoteWorkspaceStatus,
+  upsertWorkspaceItem
+} from "./services/workspace";
 import type { ContributionCategoryId } from "../shared/contributionCategories";
 
 export default function App() {
@@ -131,15 +144,14 @@ export default function App() {
     "React (공식 한국어 문서)": false,
     "Next.js": false
   });
-  const [trackedTasks, setTrackedTasks] = usePersistentState<Record<string, WorkspaceItem>>(
-    "oss:workspace-items:v1",
-    {}
-  );
+  const [trackedTasks, setTrackedTasks] = useState<Record<string, WorkspaceItem>>(readLegacyWorkspaceItems);
   const interestedTasks = trackedTasks;
   const [toast, setToast] = useState("");
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authLogoutLoading, setAuthLogoutLoading] = useState(false);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -161,6 +173,42 @@ export default function App() {
       controller.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (authLoading) return undefined;
+
+    if (!authUser) {
+      setTrackedTasks(readLegacyWorkspaceItems());
+      setWorkspaceLoading(false);
+      setWorkspaceError("");
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let active = true;
+    const legacyItems = Object.values(readLegacyWorkspaceItems());
+    setWorkspaceLoading(true);
+    setWorkspaceError("");
+
+    syncWorkspaceItems(legacyItems, controller.signal)
+      .then(items => {
+        if (!active) return;
+        setTrackedTasks(indexWorkspaceItems(items));
+        clearLegacyWorkspaceItems();
+      })
+      .catch(error => {
+        if (!active || error?.name === "AbortError") return;
+        setWorkspaceError(error instanceof Error ? error.message : "작업 목록을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (active) setWorkspaceLoading(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [authLoading, authUser]);
 
   useEffect(() => {
     const parameters = new URLSearchParams(location.search);
@@ -406,49 +454,99 @@ export default function App() {
   };
 
   const toggleTaskInterest = (task: any, kind: any) => {
+    if (authUser && workspaceLoading) {
+      triggerToast("작업 목록을 불러온 뒤 다시 시도해 주세요.");
+      return;
+    }
+
+    const existingItem = trackedTasks[task.id];
     trackAnalyticsEvent("interest_toggle", {
       content_type: kind,
       item_id: task.id,
-      action: trackedTasks[task.id] ? "remove" : "add"
+      action: existingItem ? "remove" : "add"
     });
-    setTrackedTasks(previousItems => {
-      if (previousItems[task.id]) {
-        const updatedItems = { ...previousItems };
-        delete updatedItems[task.id];
-        triggerToast(`'${task.titleKo || task.title}' 작업을 관심 목록에서 제외했습니다.`);
-        return updatedItems;
+
+    if (existingItem) {
+      const updatedItems = { ...trackedTasks };
+      delete updatedItems[task.id];
+      setTrackedTasks(updatedItems);
+      triggerToast(`'${task.titleKo || task.title}' 작업을 관심 목록에서 제외했습니다.`);
+
+      if (!authUser) {
+        writeLegacyWorkspaceItems(updatedItems);
+        return;
       }
 
-      const workspaceItem = createWorkspaceItem(task, kind);
-      triggerToast(`'${workspaceItem.title}' 작업을 관심 목록에 추가했습니다.`);
-      return { ...previousItems, [task.id]: workspaceItem };
+      void deleteRemoteWorkspaceItem(task.id).catch(error => {
+        setTrackedTasks(current => ({ ...current, [existingItem.id]: existingItem }));
+        triggerToast(error instanceof Error ? error.message : "작업을 삭제하지 못했습니다.");
+      });
+      return;
+    }
+
+    const workspaceItem = createWorkspaceItem(task, kind);
+    const updatedItems = { ...trackedTasks, [task.id]: workspaceItem };
+    setTrackedTasks(updatedItems);
+    triggerToast(`'${workspaceItem.title}' 작업을 관심 목록에 추가했습니다.`);
+
+    if (!authUser) {
+      writeLegacyWorkspaceItems(updatedItems);
+      return;
+    }
+
+    void upsertWorkspaceItem(workspaceItem).catch(error => {
+      setTrackedTasks(current => {
+        const rolledBack = { ...current };
+        delete rolledBack[workspaceItem.id];
+        return rolledBack;
+      });
+      triggerToast(error instanceof Error ? error.message : "작업을 저장하지 못했습니다.");
     });
   };
 
   const updateWorkspaceStatus = (taskId: any, status: any) => {
+    if (authUser && workspaceLoading) return;
     const statusLabel = WORKSPACE_STATUSES.find(item => item.value === status)?.label || "진행 상태";
-    setTrackedTasks(previousItems => {
-      const targetItem = previousItems[taskId];
-      if (!targetItem) return previousItems;
-      return {
-        ...previousItems,
-        [taskId]: {
-          ...targetItem,
-          status,
-          updatedAt: new Date().toISOString()
-        }
-      };
-    });
+    const targetItem = trackedTasks[taskId];
+    if (!targetItem) return;
+    const updatedItems = {
+      ...trackedTasks,
+      [taskId]: {
+        ...targetItem,
+        status,
+        updatedAt: new Date().toISOString()
+      }
+    };
+    setTrackedTasks(updatedItems);
     triggerToast(`${statusLabel}로 이동했습니다.`);
+
+    if (!authUser) {
+      writeLegacyWorkspaceItems(updatedItems);
+      return;
+    }
+
+    void updateRemoteWorkspaceStatus(taskId, status).catch(error => {
+      setTrackedTasks(current => ({ ...current, [taskId]: targetItem }));
+      triggerToast(error instanceof Error ? error.message : "작업 상태를 변경하지 못했습니다.");
+    });
   };
 
   const removeWorkspaceItem = (item: any) => {
-    setTrackedTasks(previousItems => {
-      const updatedItems = { ...previousItems };
-      delete updatedItems[item.id];
-      return updatedItems;
-    });
+    if (authUser && workspaceLoading) return;
+    const updatedItems = { ...trackedTasks };
+    delete updatedItems[item.id];
+    setTrackedTasks(updatedItems);
     triggerToast(`'${item.title}' 작업을 목록에서 삭제했습니다.`);
+
+    if (!authUser) {
+      writeLegacyWorkspaceItems(updatedItems);
+      return;
+    }
+
+    void deleteRemoteWorkspaceItem(item.id).catch(error => {
+      setTrackedTasks(current => ({ ...current, [item.id]: item }));
+      triggerToast(error instanceof Error ? error.message : "작업을 삭제하지 못했습니다.");
+    });
   };
 
   const handleCopyToClipboard = (text: any, type: any) => {
@@ -826,6 +924,8 @@ export default function App() {
   const appContextValue = {
     authUser,
     authLoading,
+    workspaceLoading,
+    workspaceError,
     trackedTasks,
     myPageStatus,
     setMyPageStatus,

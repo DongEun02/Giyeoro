@@ -4,6 +4,8 @@ export const WORKSPACE_STATUSES = [
   { value: "completed", label: "기여 완료한 이슈" }
 ];
 
+export const WORKSPACE_STORAGE_KEY = "oss:workspace-items:v1";
+
 export type WorkspaceItem = {
   id: string;
   kind: "issue" | "translation";
@@ -18,6 +20,39 @@ export type WorkspaceItem = {
   updatedAt: string;
   url?: string;
   data: Record<string, any>;
+};
+
+export const indexWorkspaceItems = (items: WorkspaceItem[]) => Object.fromEntries(
+  items.map(item => [item.id, item])
+);
+
+export const readLegacyWorkspaceItems = (): Record<string, WorkspaceItem> => {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const value = JSON.parse(window.localStorage.getItem(WORKSPACE_STORAGE_KEY) || "{}");
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? value as Record<string, WorkspaceItem>
+      : {};
+  } catch {
+    return {};
+  }
+};
+
+export const writeLegacyWorkspaceItems = (items: Record<string, WorkspaceItem>) => {
+  try {
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // Login later can still sync the in-memory list when local storage is unavailable.
+  }
+};
+
+export const clearLegacyWorkspaceItems = () => {
+  try {
+    window.localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+  } catch {
+    // The server remains the source of truth when local storage is unavailable.
+  }
 };
 
 const createIssueData = (task: any) => ({
