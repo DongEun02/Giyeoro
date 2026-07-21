@@ -13,7 +13,11 @@ export default defineConfig(({ mode }) => {
       localApiPlugin({
         apiKey: env.NVIDIA_API_KEY,
         githubToken: env.GITHUB_TOKEN,
-        model: env.NVIDIA_MODEL || "nvidia/nemotron-3-ultra-550b-a55b"
+        model: env.NVIDIA_MODEL || "nvidia/nemotron-3-ultra-550b-a55b",
+        clientId: env.GITHUB_OAUTH_CLIENT_ID,
+        clientSecret: env.GITHUB_OAUTH_CLIENT_SECRET,
+        sessionSecret: env.AUTH_SESSION_SECRET,
+        appUrl: env.APP_URL
       })
     ],
     server: {

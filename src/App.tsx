@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { OssAppProvider } from "./app/OssAppContext";
 import { BrandMark, SITE_ICON_DATA_URL } from "./components/BrandMark";
+import { GitHubAuthControl } from "./components/GitHubAuthControl";
 import { Icons } from "./components/Icons";
 import { usePersistentState } from "./hooks/usePersistentState";
 import {
@@ -15,6 +16,8 @@ import { WorkspacePage } from "./pages/WorkspacePage";
 import { fetchContributionGuide } from "./services/contributionGuide";
 import { fetchCategoryIssues } from "./services/categoryIssues";
 import { initializeAnalytics, trackAnalyticsEvent } from "./services/analytics";
+import { fetchAuthSession, getGithubLoginUrl, logoutGithub } from "./services/auth";
+import type { AuthUser } from "./services/auth";
 import { fetchGithubIssueByUrl } from "./services/githubIssue";
 import { fetchRepositoryIssues } from "./services/repositoryIssues";
 import {
@@ -134,6 +137,55 @@ export default function App() {
   );
   const interestedTasks = trackedTasks;
   const [toast, setToast] = useState("");
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authLogoutLoading, setAuthLogoutLoading] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    fetchAuthSession(controller.signal)
+      .then(user => {
+        if (active) setAuthUser(user);
+      })
+      .catch(error => {
+        if (active && error?.name !== "AbortError") setAuthUser(null);
+      })
+      .finally(() => {
+        if (active) setAuthLoading(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const parameters = new URLSearchParams(location.search);
+    const errorCode = parameters.get("auth_error");
+    if (!errorCode) return;
+
+    const messages: Record<string, string> = {
+      access_denied: "GitHub 로그인이 취소되었습니다.",
+      invalid_flow: "로그인 요청이 만료되었습니다. 다시 시도해 주세요.",
+      github_failed: "GitHub 로그인 중 오류가 발생했습니다. 다시 시도해 주세요."
+    };
+    setToast(messages[errorCode] || "GitHub 로그인을 완료하지 못했습니다.");
+    parameters.delete("auth_error");
+    navigate({
+      pathname: location.pathname,
+      search: parameters.toString() ? `?${parameters.toString()}` : "",
+      hash: location.hash
+    }, { replace: true });
+  }, [location.hash, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timeoutId = window.setTimeout(() => setToast(""), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -323,7 +375,26 @@ export default function App() {
 
   const triggerToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(""), 3000);
+  };
+
+  const handleGithubLogin = () => {
+    trackAnalyticsEvent("login", { method: "github" });
+  };
+
+  const handleGithubLogout = async () => {
+    if (authLogoutLoading) return;
+    setAuthLogoutLoading(true);
+
+    try {
+      await logoutGithub();
+      setAuthUser(null);
+      triggerToast("GitHub에서 로그아웃했습니다.");
+      trackAnalyticsEvent("logout", { method: "github" });
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : "GitHub에서 로그아웃하지 못했습니다.");
+    } finally {
+      setAuthLogoutLoading(false);
+    }
   };
 
   const toggleBookmark = (repoName: string) => {
@@ -867,7 +938,14 @@ export default function App() {
               <button type="button" aria-label="첫 기여 찾기" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className="header-search-button">
                 <Icons.Search className="w-4 h-4" />
               </button>
-              <button type="button" onClick={() => triggerToast("GitHub 로그인 연동은 준비 중입니다.")} className="header-login-button">GitHub 로그인</button>
+              <GitHubAuthControl
+                user={authUser}
+                loading={authLoading}
+                loggingOut={authLogoutLoading}
+                loginHref={getGithubLoginUrl(`${location.pathname}${location.search}${location.hash}`)}
+                onLogin={handleGithubLogin}
+                onLogout={handleGithubLogout}
+              />
             </div>
           </div>
         </header>
