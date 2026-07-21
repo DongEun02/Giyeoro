@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-type GithubAuthOptions = {
+export type GithubAuthOptions = {
   clientId?: string;
   clientSecret?: string;
   sessionSecret?: string;
@@ -8,7 +8,7 @@ type GithubAuthOptions = {
   enforceLoopback?: boolean;
 };
 
-type GithubUser = {
+export type GithubUser = {
   id: number;
   login: string;
   name: string;
@@ -331,6 +331,30 @@ export const handleGithubSessionRequest = (request: any, response: any, options:
 
   const { expiresAt: _expiresAt, ...user } = session;
   return jsonResponse(response, 200, { user });
+};
+
+export const readGithubSessionUser = (
+  request: any,
+  options: GithubAuthOptions = {}
+): GithubUser | null => {
+  const config = resolveConfig(options);
+  if (!config) return null;
+
+  const cookies = parseCookies(request);
+  const session = verifyPayload<SessionPayload>(
+    cookies[SESSION_COOKIE] || "",
+    config.sessionSecret,
+    "session"
+  );
+  if (
+    !session
+    || session.expiresAt < Date.now()
+    || !Number.isInteger(session.id)
+    || !/^[A-Za-z0-9-]{1,39}$/.test(session.login)
+  ) return null;
+
+  const { expiresAt: _expiresAt, ...user } = session;
+  return user;
 };
 
 export const handleGithubLogoutRequest = (request: any, response: any, options: GithubAuthOptions = {}) => {

@@ -86,7 +86,7 @@ export default function App() {
   const [selectedIssueType, setSelectedIssueType] = useState("All");
   const [featureRepoSearch, setFeatureRepoSearch] = useState("");
   const [featureRepoLanguage, setFeatureRepoLanguage] = useState("All");
-  const [featureSourceMode, setFeatureSourceMode] = useState('category'); // 'category' | 'repository' | 'issue-url'
+  const [featureSourceMode, setFeatureSourceMode] = useState('category'); // 'category' | 'personalized' | 'repository' | 'issue-url'
   const [selectedContributionCategory, setSelectedContributionCategory] = useState<ContributionCategoryId>("documentation");
   const [categoryRecommendationResults, setCategoryRecommendationResults] = useState<Record<string, any>>({});
   const [categoryIssuesLoading, setCategoryIssuesLoading] = useState(false);
@@ -643,9 +643,7 @@ export default function App() {
     if (!savedIssue.codexAnalysis) void analyzeIssueWithCodex(savedIssue.url);
   };
 
-  const loadRepositoryRecommendations = async (event: any) => {
-    event.preventDefault();
-    const query = repositoryQuery.trim();
+  const requestRepositoryRecommendations = async (query: string) => {
     if (!query) {
       setRepositoryIssuesError("owner/repository 형식의 저장소 이름을 입력해 주세요.");
       return;
@@ -668,6 +666,23 @@ export default function App() {
     } finally {
       setRepositoryIssuesLoading(false);
     }
+  };
+
+  const loadRepositoryRecommendations = async (event: any) => {
+    event.preventDefault();
+    await requestRepositoryRecommendations(repositoryQuery.trim());
+  };
+
+  const openPersonalizedRepository = (fullName: string) => {
+    const query = fullName.trim();
+    if (!query) return;
+    trackAnalyticsEvent("select_content", {
+      content_type: "personalized_repository",
+      item_id: query
+    });
+    setRepositoryQuery(query);
+    setFeatureSourceMode("repository");
+    void requestRepositoryRecommendations(query);
   };
 
   const openIssueDetail = (issue: any) => {
@@ -809,6 +824,8 @@ export default function App() {
   const issueAssignees = Array.isArray(issueData?.assignees) ? issueData.assignees : [];
 
   const appContextValue = {
+    authUser,
+    authLoading,
     trackedTasks,
     myPageStatus,
     setMyPageStatus,
@@ -881,6 +898,7 @@ export default function App() {
     resetFeatureIssueFilters,
     analyzeIssueWithCodex,
     loadRepositoryRecommendations,
+    openPersonalizedRepository,
     openIssueDetail,
     loadIssueByUrl,
     loadIssueFromRoute,

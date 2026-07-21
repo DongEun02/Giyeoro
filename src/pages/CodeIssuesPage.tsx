@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useOssApp } from "../app/OssAppContext";
 import { Icons } from "../components/Icons";
 import { IssueFilters, IssueRecommendationGrid } from "../components/IssueExplorer";
+import { PersonalizedRepositoryRecommendations } from "../components/PersonalizedRepositoryRecommendations";
 import { formatGithubDate } from "../data/content";
 import { CONTRIBUTION_CATEGORIES } from "../../shared/contributionCategories";
 import { TranslationPage } from "./TranslationPage";
@@ -36,9 +37,12 @@ const contributorEvidenceText = (friendliness: any) => {
 };
 
 export function CodeIssuesPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { owner, repository, issueNumber } = useParams();
   const {
+    authUser,
+    authLoading,
     issueData,
     selectedDifficulty,
     setSelectedDifficulty,
@@ -80,6 +84,7 @@ export function CodeIssuesPage() {
     resetFeatureIssueFilters,
     analyzeIssueWithCodex,
     loadRepositoryRecommendations,
+    openPersonalizedRepository,
     openIssueDetail,
     loadIssueByUrl,
     loadIssueFromRoute,
@@ -102,6 +107,19 @@ export function CodeIssuesPage() {
   const activeContributionCategory = CONTRIBUTION_CATEGORIES.find(
     category => category.id === selectedContributionCategory
   ) || CONTRIBUTION_CATEGORIES[0];
+
+  useEffect(() => {
+    if (isDetailRoute) return;
+    const parameters = new URLSearchParams(location.search);
+    if (parameters.get("source") !== "personalized") return;
+    setFeatureSourceMode("personalized");
+    parameters.delete("source");
+    navigate({
+      pathname: location.pathname,
+      search: parameters.toString() ? `?${parameters.toString()}` : "",
+      hash: location.hash
+    }, { replace: true });
+  }, [isDetailRoute, location.hash, location.pathname, location.search, navigate, setFeatureSourceMode]);
 
   useEffect(() => {
     if (!isDetailRoute) return;
@@ -355,6 +373,7 @@ export function CodeIssuesPage() {
         <div className="feature-source-tabs" role="tablist" aria-label="첫 기여 찾기 방식">
           {[
             ["category", "단계별 추천"],
+            ["personalized", "내 맞춤 프로젝트"],
             ["repository", "저장소로 찾기"],
             ["issue-url", "이슈 URL로 찾기"]
           ].map(([mode, label]) => (
@@ -376,7 +395,13 @@ export function CodeIssuesPage() {
           ))}
         </div>
 
-        {featureSourceMode === "category" ? (
+        {featureSourceMode === "personalized" ? (
+          <PersonalizedRepositoryRecommendations
+            user={authUser}
+            authLoading={authLoading}
+            onExploreRepository={openPersonalizedRepository}
+          />
+        ) : featureSourceMode === "category" ? (
           <div className="category-recommendation-flow">
             <section className="contribution-growth" aria-labelledby="contribution-growth-heading">
               <div className="contribution-growth-heading">
