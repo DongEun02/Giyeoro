@@ -1053,7 +1053,9 @@ export default function App() {
             <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴">
               <button type="button" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "feature" || view === "translation" ? "nav-button-active" : ""}`}>첫 기여 찾기</button>
               <button type="button" onClick={() => setView("guide")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "guide" ? "nav-button-active" : ""}`}>기여 가이드</button>
-              <button type="button" onClick={() => setView("mypage")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "mypage" ? "nav-button-active" : ""}`}>마이페이지</button>
+              {authUser && (
+                <button type="button" onClick={() => setView("mypage")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "mypage" ? "nav-button-active" : ""}`}>마이페이지</button>
+              )}
             </nav>
 
             <div className="header-actions">
