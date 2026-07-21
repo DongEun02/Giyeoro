@@ -4439,6 +4439,84 @@ body {
 }
 
 /* Personal contribution workspace */
+.mypage-login-gate {
+  min-height: 430px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 54px 28px;
+  border: 1px solid #dce3fa;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #ffffff 35%, #f2f5ff 100%);
+  text-align: center;
+}
+
+.mypage-login-icon {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: #171717;
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(23, 23, 23, .14);
+}
+
+.mypage-login-gate > div {
+  max-width: 530px;
+  margin-top: 24px;
+}
+
+.mypage-login-gate > div > span {
+  color: #3366ff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+.mypage-login-gate h1 {
+  margin: 8px 0 0;
+  color: #171717;
+  font-size: 25px;
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+.mypage-login-gate p {
+  margin: 12px 0 0;
+  color: #707070;
+  font-size: 11px;
+  line-height: 1.75;
+}
+
+.mypage-login-button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: #171717;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.mypage-login-button:hover {
+  background: #333333;
+}
+
+.mypage-login-gate > small {
+  margin-top: 14px;
+  color: #999999;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
 .mypage {
   display: flex;
   flex-direction: column;
@@ -4488,11 +4566,21 @@ body {
   width: 42px;
   height: 42px;
   flex: 0 0 42px;
+  display: block;
+  overflow: hidden;
+  border-radius: 50%;
 }
 
 .mypage-profile-mark .brand-mark-svg {
   width: 42px;
   height: 42px;
+}
+
+.mypage-profile-mark > img {
+  width: 42px;
+  height: 42px;
+  display: block;
+  object-fit: cover;
 }
 
 .mypage-profile strong,
@@ -5790,6 +5878,19 @@ body {
 
   .mypage {
     gap: 25px;
+  }
+
+  .mypage-login-gate {
+    min-height: 380px;
+    padding: 42px 20px;
+  }
+
+  .mypage-login-gate h1 {
+    font-size: 21px;
+  }
+
+  .mypage-login-button {
+    width: 100%;
   }
 
   .mypage-heading h1 {

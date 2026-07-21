@@ -25,7 +25,7 @@ npm run dev
 - `/translations/:repoKey/:docId`: 번역 문서 상세
 - `/issues`: 문서 번역을 포함한 성장 단계별 카테고리 추천, 저장소 검색, 이슈 URL 검색 및 상세
 - `/guides`: 저장소별 기여 가이드
-- `/mypage`: 관심·진행 중·기여 완료 이슈 모음
+- `/mypage`: GitHub 로그인 후 확인하는 관심·진행 중·기여 완료 이슈 모음
 
 상세 페이지는 React Router 경로를 사용하며, `vercel.json`의 rewrite 설정으로 배포 환경에서도 직접 접속할 수 있습니다.
 

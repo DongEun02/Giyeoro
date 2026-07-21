@@ -4,8 +4,10 @@ import { Icons } from "./Icons";
 import { getRepoVisual } from "../data/content";
 import { WORKSPACE_STATUSES } from "../services/userWorkspace";
 import type { WorkspaceItem } from "../services/userWorkspace";
+import type { AuthUser } from "../services/auth";
 
 type MyPageProps = {
+  user: AuthUser;
   items: Record<string, WorkspaceItem>;
   activeStatus: string;
   onActiveStatusChange: (status: string) => void;
@@ -16,6 +18,7 @@ type MyPageProps = {
 };
 
 export const MyPage = ({
+  user,
   items,
   activeStatus,
   onActiveStatusChange,
@@ -44,10 +47,20 @@ export const MyPage = ({
 
       <section className="mypage-overview" aria-label="기여 현황 요약">
         <div className="mypage-profile">
-          <span className="mypage-profile-mark"><BrandMark /></span>
+          <a
+            href={user.profileUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mypage-profile-mark"
+            aria-label={`${user.login} GitHub 프로필 열기`}
+          >
+            {user.avatarUrl
+              ? <img src={user.avatarUrl} alt="" width="42" height="42" referrerPolicy="no-referrer" />
+              : <BrandMark />}
+          </a>
           <div>
-            <strong>나의 오픈소스 기여</strong>
-            <span>이 브라우저에 저장된 작업 기준</span>
+            <strong>{user.name}</strong>
+            <span>@{user.login} · 이 브라우저에 저장된 작업 기준</span>
           </div>
         </div>
 
