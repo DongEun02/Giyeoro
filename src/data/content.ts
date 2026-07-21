@@ -352,7 +352,7 @@ export const DIFFICULTY_CARD_LABELS = {
   unlabeled: "난이도 미분류"
 };
 
-export const ISSUE_TYPE_FILTERS = ["All", "버그", "기능 개선", "리팩터링", "예외 처리", "성능", "테스트", "문서"];
+export const ISSUE_TYPE_FILTERS = ["All", "문서", "테스트", "타입 개선", "버그", "기능 개선", "리팩터링", "예외 처리", "성능"];
 
 export const REPO_VISUALS: Record<string, { image: string; background: string }> = {
   "TanStack Query": { image: "https://github.com/TanStack.png?size=320", background: "#edf3ff" },

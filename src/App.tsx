@@ -13,6 +13,7 @@ import { LandingPage } from "./pages/LandingPage";
 import { TranslationPage } from "./pages/TranslationPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { fetchContributionGuide } from "./services/contributionGuide";
+import { fetchCategoryIssues } from "./services/categoryIssues";
 import { initializeAnalytics, trackAnalyticsEvent } from "./services/analytics";
 import { fetchGithubIssueByUrl } from "./services/githubIssue";
 import { fetchRepositoryIssues } from "./services/repositoryIssues";
@@ -24,6 +25,7 @@ import {
 } from "./services/translationStatus";
 import { createWorkspaceItem, WORKSPACE_STATUSES } from "./services/userWorkspace";
 import type { WorkspaceItem } from "./services/userWorkspace";
+import type { ContributionCategoryId } from "../shared/contributionCategories";
 
 export default function App() {
   const location = useLocation();
@@ -81,7 +83,13 @@ export default function App() {
   const [selectedIssueType, setSelectedIssueType] = useState("All");
   const [featureRepoSearch, setFeatureRepoSearch] = useState("");
   const [featureRepoLanguage, setFeatureRepoLanguage] = useState("All");
-  const [featureSourceMode, setFeatureSourceMode] = useState('repository'); // 'repository' | 'issue-url'
+  const [featureSourceMode, setFeatureSourceMode] = useState('category'); // 'category' | 'repository' | 'issue-url'
+  const [selectedContributionCategory, setSelectedContributionCategory] = useState<ContributionCategoryId>("documentation");
+  const [categoryRecommendationResults, setCategoryRecommendationResults] = useState<Record<string, any>>({});
+  const [categoryIssuesLoading, setCategoryIssuesLoading] = useState(false);
+  const [categoryIssuesError, setCategoryIssuesError] = useState("");
+  const [categoryRefreshVersion, setCategoryRefreshVersion] = useState(0);
+  const handledCategoryRefresh = useRef(0);
   const [repositoryQuery, setRepositoryQuery] = useState("");
   const [repositoryIssues, setRepositoryIssues] = useState<any[]>([]);
   const [repositoryIssueResult, setRepositoryIssueResult] = useState<any>(null);
@@ -134,6 +142,53 @@ export default function App() {
     favicon.href = SITE_ICON_DATA_URL;
     document.title = 'OSS';
   }, []);
+
+  useEffect(() => {
+    if (view !== 'feature' || featureSourceMode !== 'category') return undefined;
+
+    const force = categoryRefreshVersion > handledCategoryRefresh.current;
+    handledCategoryRefresh.current = categoryRefreshVersion;
+    if (!force && categoryRecommendationResults[selectedContributionCategory]) return undefined;
+
+    const controller = new AbortController();
+    const requestTimeout = setTimeout(() => controller.abort(), 75_000);
+    let active = true;
+    setCategoryIssuesLoading(true);
+    setCategoryIssuesError("");
+
+    fetchCategoryIssues(selectedContributionCategory, { force, signal: controller.signal })
+      .then(result => {
+        if (!active) return;
+        clearTimeout(requestTimeout);
+        setCategoryRecommendationResults(current => ({
+          ...current,
+          [selectedContributionCategory]: result
+        }));
+        setCategoryIssuesLoading(false);
+      })
+      .catch(error => {
+        if (!active) return;
+        clearTimeout(requestTimeout);
+        setCategoryIssuesError(
+          error?.name === 'AbortError'
+            ? "카테고리 추천 이슈를 불러오는 시간이 초과됐습니다."
+            : error?.message || "카테고리 추천 이슈를 불러오지 못했습니다."
+        );
+        setCategoryIssuesLoading(false);
+      });
+
+    return () => {
+      active = false;
+      clearTimeout(requestTimeout);
+      controller.abort();
+    };
+  }, [
+    view,
+    featureSourceMode,
+    selectedContributionCategory,
+    categoryRefreshVersion,
+    categoryRecommendationResults
+  ]);
 
   useEffect(() => {
     if (view !== 'guide' || !guideRepoKey || guideDetails[guideRepoKey]) return undefined;
@@ -364,6 +419,29 @@ export default function App() {
     setSelectedIssueType("All");
   };
 
+  const selectContributionCategory = (category: ContributionCategoryId) => {
+    trackAnalyticsEvent("select_content", {
+      content_type: "contribution_category",
+      item_id: category
+    });
+    setSelectedContributionCategory(category);
+    resetFeatureIssueFilters();
+  };
+
+  const refreshCategoryRecommendations = () => {
+    trackAnalyticsEvent("content_refresh", {
+      content_type: "category_issues",
+      category: selectedContributionCategory
+    });
+    setCategoryIssuesError("");
+    setCategoryRecommendationResults(current => {
+      const updated = { ...current };
+      delete updated[selectedContributionCategory];
+      return updated;
+    });
+    setCategoryRefreshVersion(version => version + 1);
+  };
+
   const analyzeIssueWithCodex = async (targetUrl: any) => {
     setCodexAnalysis(null);
     setCodexAnalysisError("");
@@ -463,7 +541,9 @@ export default function App() {
     setIssueData(savedIssue);
     setCodexAnalysis(savedIssue.codexAnalysis || null);
     setCodexAnalysisError("");
-    setFeatureSourceMode(savedIssue.source === 'github-import' ? 'issue-url' : 'repository');
+    setFeatureSourceMode(savedIssue.source === 'github-import'
+      ? 'issue-url'
+      : savedIssue.source === 'github-category' ? 'category' : 'repository');
     navigate(`/issues/${savedIssue.repo}/${savedIssue.number}`);
     if (!savedIssue.codexAnalysis) void analyzeIssueWithCodex(savedIssue.url);
   };
@@ -578,7 +658,13 @@ export default function App() {
     return matchSearch && matchLanguage;
   });
 
-  const activeFeatureIssues = featureSourceMode === 'repository' ? repositoryIssues : [];
+  const selectedCategoryResult = categoryRecommendationResults[selectedContributionCategory] || null;
+  const categoryIssues: any[] = selectedCategoryResult?.issues || [];
+  const categoryRepositories: any[] = selectedCategoryResult?.repositories || [];
+  const categoryRecommendationFailures: any[] = selectedCategoryResult?.failedRepositories || [];
+  const activeFeatureIssues: any[] = featureSourceMode === 'category'
+    ? categoryIssues
+    : featureSourceMode === 'repository' ? repositoryIssues : [];
   const filteredFeatureIssues = activeFeatureIssues.filter(issue => {
     const query = featureRepoSearch.trim().toLowerCase();
     const matchSearch = !query || [issue.repo, issue.title, issue.summary, issue.workType, issue.typeLabel]
@@ -590,17 +676,26 @@ export default function App() {
   });
 
   const selectedGuideResult = guideDetails[guideRepoKey];
-  const featureLanguageOptions = [
+  const featureLanguageOptions: string[] = [
     "All",
-    ...[...new Set(activeFeatureIssues.flatMap(issue => issue.languageTags || []))]
+    ...[...new Set<string>(activeFeatureIssues.flatMap((issue: any) => issue.languageTags || []))]
       .sort((a, b) => a.localeCompare(b))
   ];
 
   const isGithubIssue = [
     'github-import',
     'github-recommendation',
-    'github-repository'
+    'github-repository',
+    'github-category'
   ].includes(issueData?.source);
+  const categoryLoadedAtText = selectedCategoryResult?.loadedAt
+    ? new Intl.DateTimeFormat('ko-KR', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(new Date(selectedCategoryResult.loadedAt))
+    : '';
   const translationStatusGeneratedAtText = translationStatusGeneratedAt
     ? new Intl.DateTimeFormat('ko-KR', {
         month: 'short',
@@ -663,6 +758,15 @@ export default function App() {
     setFeatureRepoLanguage,
     featureSourceMode,
     setFeatureSourceMode,
+    selectedContributionCategory,
+    selectContributionCategory,
+    categoryIssues,
+    categoryRepositories,
+    categoryRecommendationFailures,
+    categoryIssuesLoading,
+    categoryIssuesError,
+    categoryLoadedAtText,
+    refreshCategoryRecommendations,
     repositoryQuery,
     setRepositoryQuery,
     repositoryIssues,
@@ -731,13 +835,13 @@ export default function App() {
 
             <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴">
               <button type="button" onClick={() => setView("translation")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "translation" ? "nav-button-active" : ""}`}>번역 기여</button>
-              <button type="button" onClick={() => { setFeatureSourceMode("repository"); setView("feature"); }} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "feature" ? "nav-button-active" : ""}`}>코드 이슈</button>
+              <button type="button" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "feature" ? "nav-button-active" : ""}`}>코드 이슈</button>
               <button type="button" onClick={() => setView("guide")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "guide" ? "nav-button-active" : ""}`}>기여 가이드</button>
               <button type="button" onClick={() => setView("mypage")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "mypage" ? "nav-button-active" : ""}`}>마이페이지</button>
             </nav>
 
             <div className="header-actions">
-              <button type="button" aria-label="코드 이슈 검색" onClick={() => { setFeatureSourceMode("repository"); setView("feature"); }} className="header-search-button">
+              <button type="button" aria-label="코드 이슈 검색" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className="header-search-button">
                 <Icons.Search className="w-4 h-4" />
               </button>
               <button type="button" onClick={() => triggerToast("GitHub 로그인 연동은 준비 중입니다.")} className="header-login-button">GitHub 로그인</button>

@@ -10,7 +10,8 @@ export const IssueFilters = ({
   difficulty,
   onDifficultyChange,
   issueType,
-  onIssueTypeChange
+  onIssueTypeChange,
+  showIssueType = true
 }: any) => (
   <div className="filter-panel p-3 space-y-3">
     <div className="space-y-2">
@@ -43,25 +44,27 @@ export const IssueFilters = ({
         ))}
       </div>
     </div>
-    <div className="soft-divider pt-3 border-t space-y-2">
-      <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider block">작업 유형</span>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {ISSUE_TYPE_FILTERS.map(type => (
-          <button
-            key={type}
-            type="button"
-            onClick={() => onIssueTypeChange(type)}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-all ${
-              issueType === type
-                ? "bg-[#3f6fd9] text-white border-[#3f6fd9]"
-                : "bg-white text-[#57606a] border-[#d0d7de] hover:bg-[#f6f8fa]"
-            }`}
-          >
-            {type === "All" ? "전체 유형" : type}
-          </button>
-        ))}
+    {showIssueType && (
+      <div className="soft-divider pt-3 border-t space-y-2">
+        <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider block">작업 유형</span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {ISSUE_TYPE_FILTERS.map(type => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => onIssueTypeChange(type)}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition-all ${
+                issueType === type
+                  ? "bg-[#3f6fd9] text-white border-[#3f6fd9]"
+                  : "bg-white text-[#57606a] border-[#d0d7de] hover:bg-[#f6f8fa]"
+              }`}
+            >
+              {type === "All" ? "전체 유형" : type}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+    )}
   </div>
 );
 
@@ -77,8 +80,13 @@ export const IssueRecommendationGrid = ({
       <article
         key={issue.id}
         className="contribution-item"
-        onClick={() => onSelectIssue(issue)}
       >
+        <button
+          type="button"
+          className="contribution-card-link"
+          aria-label={`${issue.repo}의 ${issue.title} 이슈 자세히 보기`}
+          onClick={() => onSelectIssue(issue)}
+        />
         <div
           className="contribution-cover"
           style={{ background: getRepoVisual(issue.repo).background }}
@@ -96,7 +104,7 @@ export const IssueRecommendationGrid = ({
             {(issue.assignees?.length || 0) > 0 ? `담당자 ${issue.assignees.length}명` : "담당자 없음"}
           </span>
           <img src={issue.repositoryAvatarUrl || getRepoVisual(issue.repo).image} alt="" />
-          <span className="contribution-cover-kind"><Icons.Code className="w-3.5 h-3.5" /> 코드</span>
+          <span className="contribution-cover-kind"><Icons.Code className="w-3.5 h-3.5" /> {issue.categoryLabel || "코드"}</span>
         </div>
 
         <div className="contribution-main">
@@ -123,6 +131,7 @@ export const IssueRecommendationGrid = ({
             ))}
           </div>
           <div className="contribution-live-meta">
+            {issue.repositoryActivity?.label && <span>저장소 {issue.repositoryActivity.label}</span>}
             <span>{formatGithubDate(issue.updatedAt)} 업데이트</span>
             <span>댓글 {issue.comments}개</span>
             <span title="GitHub 이슈 타임라인에서 확인한 연관 PR 수">

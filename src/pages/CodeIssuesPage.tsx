@@ -4,6 +4,7 @@ import { useOssApp } from "../app/OssAppContext";
 import { Icons } from "../components/Icons";
 import { IssueFilters, IssueRecommendationGrid } from "../components/IssueExplorer";
 import { formatGithubDate } from "../data/content";
+import { CONTRIBUTION_CATEGORIES } from "../../shared/contributionCategories";
 
 const formatResponseDuration = (hours: any) => {
   if (!Number.isFinite(hours)) return "확인 불가";
@@ -48,6 +49,15 @@ export function CodeIssuesPage() {
     setFeatureRepoLanguage,
     featureSourceMode,
     setFeatureSourceMode,
+    selectedContributionCategory,
+    selectContributionCategory,
+    categoryIssues,
+    categoryRepositories,
+    categoryRecommendationFailures,
+    categoryIssuesLoading,
+    categoryIssuesError,
+    categoryLoadedAtText,
+    refreshCategoryRecommendations,
     repositoryQuery,
     setRepositoryQuery,
     repositoryIssues,
@@ -88,6 +98,9 @@ export function CodeIssuesPage() {
     ? issueData.relatedPullRequestCount
     : null;
   const hasRelatedPullRequests = relatedPullRequestCount !== null && relatedPullRequestCount > 0;
+  const activeContributionCategory = CONTRIBUTION_CATEGORIES.find(
+    category => category.id === selectedContributionCategory
+  ) || CONTRIBUTION_CATEGORIES[0];
 
   useEffect(() => {
     if (!isDetailRoute) return;
@@ -334,12 +347,13 @@ export function CodeIssuesPage() {
         <div className="page-heading pb-2">
           <h2 className="text-xl font-bold text-[#1f2933]">코드 이슈</h2>
           <p className="text-xs text-[#57606a]">
-            관심 있는 오픈소스 저장소나 GitHub 이슈 URL을 입력해 기여할 작업을 직접 찾을 수 있습니다.
+            작은 문서 기여부터 기능 구현까지 단계적으로 경험하며 다음 기여를 찾아보세요.
           </p>
         </div>
 
         <div className="feature-source-tabs" role="tablist" aria-label="코드 이슈 찾기 방식">
           {[
+            ["category", "단계별 추천"],
             ["repository", "저장소로 찾기"],
             ["issue-url", "이슈 URL로 찾기"]
           ].map(([mode, label]) => (
@@ -361,7 +375,146 @@ export function CodeIssuesPage() {
           ))}
         </div>
 
-        {featureSourceMode === "repository" ? (
+        {featureSourceMode === "category" ? (
+          <div className="category-recommendation-flow">
+            <section className="contribution-growth" aria-labelledby="contribution-growth-heading">
+              <div className="contribution-growth-heading">
+                <div>
+                  <span>첫 기여 성장 경로</span>
+                  <h3 id="contribution-growth-heading">내가 시작할 작업 유형을 선택하세요</h3>
+                </div>
+                <p>단계는 권장 순서이며, 익숙한 유형부터 시작해도 괜찮습니다.</p>
+              </div>
+
+              <ol className="contribution-category-list">
+                {CONTRIBUTION_CATEGORIES.map(category => (
+                  <li key={category.id}>
+                    <button
+                      type="button"
+                      aria-pressed={selectedContributionCategory === category.id}
+                      onClick={() => selectContributionCategory(category.id)}
+                      className={`contribution-category-card ${selectedContributionCategory === category.id ? "contribution-category-card-active" : ""}`}
+                    >
+                      <span className="contribution-category-stage">STEP {category.stage}</span>
+                      <strong>{category.title}</strong>
+                      <small>{category.stageLabel}</small>
+                      <p>{category.description}</p>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+
+              <div className="category-selection-note" role="status">
+                <Icons.Check className="w-4 h-4 shrink-0" />
+                <span>
+                  <strong>{activeContributionCategory.title}</strong>
+                  최근 90일 내 활동 · 기여 가이드와 외부 PR 응답 우선 · 담당자 없음 · 연관 PR 없음 기준으로 선별합니다.
+                </span>
+              </div>
+            </section>
+
+            {categoryIssuesLoading && (
+              <div className="recommendation-status" role="status">
+                <span className="recommendation-status-spinner" aria-hidden="true" />
+                <div>
+                  <strong>활동 중인 저장소에서 {activeContributionCategory.title} 이슈를 찾고 있습니다.</strong>
+                  <span>최근 push, 기여 가이드, 담당자와 연관 Pull Request를 함께 확인합니다.</span>
+                </div>
+              </div>
+            )}
+
+            {categoryIssuesError && !categoryIssuesLoading && (
+              <div className="recommendation-status recommendation-status-error" role="alert">
+                <Icons.Alert className="w-4 h-4 shrink-0" />
+                <div><strong>추천 이슈를 불러오지 못했습니다.</strong><span>{categoryIssuesError}</span></div>
+                <button type="button" onClick={refreshCategoryRecommendations}>다시 시도</button>
+              </div>
+            )}
+
+            {!categoryIssuesLoading && !categoryIssuesError && (
+              <>
+                <div className="category-result-heading">
+                  <div>
+                    <span>선택한 카테고리</span>
+                    <h3>{activeContributionCategory.title} 추천 이슈</h3>
+                    <p>{activeContributionCategory.description}</p>
+                  </div>
+                  <div className="recommendation-sync-summary">
+                    <span>총 <strong>{categoryIssues.length}개</strong> 추천</span>
+                    {categoryLoadedAtText && <small>{categoryLoadedAtText} 확인</small>}
+                    <button type="button" onClick={refreshCategoryRecommendations}>새로고침</button>
+                  </div>
+                </div>
+
+                {categoryRepositories.length > 0 && (
+                  <section className="category-repository-section" aria-labelledby="category-repository-heading">
+                    <div className="category-repository-heading">
+                      <h4 id="category-repository-heading">현재 추천에 포함된 저장소</h4>
+                      <span>GitHub의 최신 상태를 기준으로 표시합니다.</span>
+                    </div>
+                    <div className="category-repository-list">
+                      {categoryRepositories.map((repo: any) => (
+                        <a key={repo.fullName} href={repo.url} target="_blank" rel="noreferrer" className="category-repository-card">
+                          <img src={repo.ownerAvatarUrl} alt="" />
+                          <span>
+                            <strong>{repo.fullName}</strong>
+                            <small>
+                              {repo.language} · 추천 이슈 {repo.issueCount}개
+                              {repo.contributorFriendliness?.label ? ` · 기여 친화도 ${repo.contributorFriendliness.label}` : ""}
+                            </small>
+                          </span>
+                          <span className={`repository-health-status repository-health-${repo.activity?.level || "unknown"}`}>
+                            <i aria-hidden="true" />
+                            {repo.activity?.label || "확인 불가"}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {categoryRecommendationFailures.length > 0 && (
+                  <div className="recommendation-partial-notice" role="status">
+                    일부 후보 저장소를 확인하지 못해 현재 검증된 저장소의 이슈만 표시합니다.
+                  </div>
+                )}
+
+                <div className="category-result-tools">
+                  <div className="relative w-full md:max-w-md">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-slate-400"><Icons.Search className="w-4 h-4" /></span>
+                    <input
+                      type="text"
+                      value={featureRepoSearch}
+                      onChange={event => setFeatureRepoSearch(event.target.value)}
+                      placeholder={`${activeContributionCategory.title} 이슈 안에서 검색`}
+                      className="search-input w-full bg-white border focus:border-[#3f6fd9] focus:ring-1 focus:ring-[#3f6fd9] pl-9 pr-4 py-2 text-xs text-[#1f2933] outline-none placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <IssueFilters
+                  language={featureRepoLanguage}
+                  languages={featureLanguageOptions}
+                  onLanguageChange={setFeatureRepoLanguage}
+                  difficulty={selectedDifficulty}
+                  onDifficultyChange={setSelectedDifficulty}
+                  issueType={selectedIssueType}
+                  onIssueTypeChange={setSelectedIssueType}
+                  showIssueType={false}
+                />
+                <IssueRecommendationGrid
+                  issues={filteredFeatureIssues}
+                  interestedTasks={interestedTasks}
+                  onSelectIssue={selectIssue}
+                  onToggleInterest={toggleTaskInterest}
+                  emptyText={categoryIssues.length === 0
+                    ? `현재 조건을 충족하는 ${activeContributionCategory.title} 이슈를 찾지 못했습니다.`
+                    : "현재 필터에 맞는 이슈가 없습니다."}
+                />
+              </>
+            )}
+          </div>
+        ) : featureSourceMode === "repository" ? (
           <div className="space-y-5">
             <section className="issue-import-panel" aria-labelledby="repository-search-heading">
               <h3 id="repository-search-heading">저장소 추천 이슈 찾기</h3>

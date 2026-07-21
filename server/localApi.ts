@@ -1,5 +1,8 @@
 import { handleAnalyzeIssueRequest, handleGithubIssueRequest } from "./issueAnalysisService.js";
-import { handleRepositoryIssuesRequest } from "./githubRecommendationsService.js";
+import {
+  handleCategoryIssuesRequest,
+  handleRepositoryIssuesRequest
+} from "./githubRecommendationsService.js";
 import { handleTranslationStatusRequest } from "./translationStatusService.js";
 import { handleContributionGuideRequest } from "./contributionGuideService.js";
 
@@ -20,6 +23,12 @@ export const localApiPlugin = (options: any) => ({
     ));
     server.middlewares.use("/api/translation-status", (request: any, response: any) => (
       handleTranslationStatusRequest(request, response, {
+        ...options,
+        enforceLoopback: true
+      })
+    ));
+    server.middlewares.use("/api/category-issues", (request: any, response: any) => (
+      handleCategoryIssuesRequest(request, response, {
         ...options,
         enforceLoopback: true
       })
