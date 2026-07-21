@@ -90,6 +90,14 @@ export default function App() {
   const [categoryIssuesError, setCategoryIssuesError] = useState("");
   const [categoryRefreshVersion, setCategoryRefreshVersion] = useState(0);
   const handledCategoryRefresh = useRef(0);
+
+  useEffect(() => {
+    if (location.pathname !== "/translations") return;
+    setFeatureSourceMode("category");
+    setSelectedContributionCategory("documentation");
+    navigate("/issues", { replace: true });
+  }, [location.pathname, navigate]);
+
   const [repositoryQuery, setRepositoryQuery] = useState("");
   const [repositoryIssues, setRepositoryIssues] = useState<any[]>([]);
   const [repositoryIssueResult, setRepositoryIssueResult] = useState<any>(null);
@@ -144,7 +152,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (view !== 'feature' || featureSourceMode !== 'category') return undefined;
+    if (
+      view !== 'feature'
+      || featureSourceMode !== 'category'
+      || selectedContributionCategory === 'documentation'
+    ) return undefined;
 
     const force = categoryRefreshVersion > handledCategoryRefresh.current;
     handledCategoryRefresh.current = categoryRefreshVersion;
@@ -227,7 +239,13 @@ export default function App() {
   }, [view, guideRepoKey, guideDetailRefreshVersion]);
 
   useEffect(() => {
-    if (view !== 'translation') return undefined;
+    const isTranslationDiscoveryView = view === 'translation'
+      || (
+        view === 'feature'
+        && featureSourceMode === 'category'
+        && selectedContributionCategory === 'documentation'
+      );
+    if (!isTranslationDiscoveryView) return undefined;
 
     const controller = new AbortController();
     const requestTimeout = setTimeout(() => controller.abort(), 100_000);
@@ -279,7 +297,13 @@ export default function App() {
       clearTimeout(requestTimeout);
       controller.abort();
     };
-  }, [view, translationLanguage, translationStatusRefreshVersion]);
+  }, [
+    view,
+    featureSourceMode,
+    selectedContributionCategory,
+    translationLanguage,
+    translationStatusRefreshVersion
+  ]);
 
   const refreshTranslationStatuses = () => {
     trackAnalyticsEvent("content_refresh", {
@@ -834,14 +858,13 @@ export default function App() {
             </button>
 
             <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴">
-              <button type="button" onClick={() => setView("translation")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "translation" ? "nav-button-active" : ""}`}>번역 기여</button>
-              <button type="button" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "feature" ? "nav-button-active" : ""}`}>코드 이슈</button>
+              <button type="button" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "feature" || view === "translation" ? "nav-button-active" : ""}`}>첫 기여 찾기</button>
               <button type="button" onClick={() => setView("guide")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "guide" ? "nav-button-active" : ""}`}>기여 가이드</button>
               <button type="button" onClick={() => setView("mypage")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "mypage" ? "nav-button-active" : ""}`}>마이페이지</button>
             </nav>
 
             <div className="header-actions">
-              <button type="button" aria-label="코드 이슈 검색" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className="header-search-button">
+              <button type="button" aria-label="첫 기여 찾기" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className="header-search-button">
                 <Icons.Search className="w-4 h-4" />
               </button>
               <button type="button" onClick={() => triggerToast("GitHub 로그인 연동은 준비 중입니다.")} className="header-login-button">GitHub 로그인</button>
@@ -852,7 +875,7 @@ export default function App() {
         <main className="app-main flex-grow">
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/translations" element={<TranslationPage />} />
+            <Route path="/translations" element={<Navigate to="/issues" replace />} />
             <Route path="/translations/:repoKey/:docId" element={<TranslationPage />} />
             <Route path="/issues" element={<CodeIssuesPage />} />
             <Route path="/issues/:owner/:repository/:issueNumber" element={<CodeIssuesPage />} />

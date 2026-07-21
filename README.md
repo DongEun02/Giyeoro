@@ -21,8 +21,8 @@ npm run dev
 
 ## 페이지 경로
 
-- `/translations`: 번역 작업 목록 및 문서 상세
-- `/issues`: 성장 단계별 카테고리 추천, 저장소 검색, 이슈 URL 검색 및 상세
+- `/translations/:repoKey/:docId`: 번역 문서 상세
+- `/issues`: 문서 번역을 포함한 성장 단계별 카테고리 추천, 저장소 검색, 이슈 URL 검색 및 상세
 - `/guides`: 저장소별 기여 가이드
 - `/mypage`: 관심·진행 중·기여 완료 이슈 모음
 

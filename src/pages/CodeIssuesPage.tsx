@@ -5,6 +5,7 @@ import { Icons } from "../components/Icons";
 import { IssueFilters, IssueRecommendationGrid } from "../components/IssueExplorer";
 import { formatGithubDate } from "../data/content";
 import { CONTRIBUTION_CATEGORIES } from "../../shared/contributionCategories";
+import { TranslationPage } from "./TranslationPage";
 
 const formatResponseDuration = (hours: any) => {
   if (!Number.isFinite(hours)) return "확인 불가";
@@ -345,13 +346,13 @@ export function CodeIssuesPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="space-y-6">
         <div className="page-heading pb-2">
-          <h2 className="text-xl font-bold text-[#1f2933]">코드 이슈</h2>
+          <h2 className="text-xl font-bold text-[#1f2933]">첫 기여 찾기</h2>
           <p className="text-xs text-[#57606a]">
-            작은 문서 기여부터 기능 구현까지 단계적으로 경험하며 다음 기여를 찾아보세요.
+            처음이라면 STEP 1부터 시작하고, 익숙해지면 다음 단계의 기여로 넘어가 보세요.
           </p>
         </div>
 
-        <div className="feature-source-tabs" role="tablist" aria-label="코드 이슈 찾기 방식">
+        <div className="feature-source-tabs" role="tablist" aria-label="첫 기여 찾기 방식">
           {[
             ["category", "단계별 추천"],
             ["repository", "저장소로 찾기"],
@@ -395,7 +396,9 @@ export function CodeIssuesPage() {
                       onClick={() => selectContributionCategory(category.id)}
                       className={`contribution-category-card ${selectedContributionCategory === category.id ? "contribution-category-card-active" : ""}`}
                     >
-                      <span className="contribution-category-stage">STEP {category.stage}</span>
+                      <span className="contribution-category-stage">
+                        STEP {category.stage}{category.id === "documentation" ? " · 첫 기여 추천" : ""}
+                      </span>
                       <strong>{category.title}</strong>
                       <small>{category.stageLabel}</small>
                       <p>{category.description}</p>
@@ -408,12 +411,16 @@ export function CodeIssuesPage() {
                 <Icons.Check className="w-4 h-4 shrink-0" />
                 <span>
                   <strong>{activeContributionCategory.title}</strong>
-                  최근 90일 내 활동 · 기여 가이드와 외부 PR 응답 우선 · 담당자 없음 · 연관 PR 없음 기준으로 선별합니다.
+                  {selectedContributionCategory === "documentation"
+                    ? "검증된 한국어 번역 저장소에서 최근 변경된 원문과 번역 문서를 비교합니다."
+                    : "최근 90일 내 활동 · 기여 가이드와 외부 PR 응답 우선 · 담당자 없음 · 연관 PR 없음 기준으로 선별합니다."}
                 </span>
               </div>
             </section>
 
-            {categoryIssuesLoading && (
+            {selectedContributionCategory === "documentation" && <TranslationPage embedded />}
+
+            {selectedContributionCategory !== "documentation" && categoryIssuesLoading && (
               <div className="recommendation-status" role="status">
                 <span className="recommendation-status-spinner" aria-hidden="true" />
                 <div>
@@ -423,7 +430,7 @@ export function CodeIssuesPage() {
               </div>
             )}
 
-            {categoryIssuesError && !categoryIssuesLoading && (
+            {selectedContributionCategory !== "documentation" && categoryIssuesError && !categoryIssuesLoading && (
               <div className="recommendation-status recommendation-status-error" role="alert">
                 <Icons.Alert className="w-4 h-4 shrink-0" />
                 <div><strong>추천 이슈를 불러오지 못했습니다.</strong><span>{categoryIssuesError}</span></div>
@@ -431,7 +438,7 @@ export function CodeIssuesPage() {
               </div>
             )}
 
-            {!categoryIssuesLoading && !categoryIssuesError && (
+            {selectedContributionCategory !== "documentation" && !categoryIssuesLoading && !categoryIssuesError && (
               <>
                 <div className="category-result-heading">
                   <div>

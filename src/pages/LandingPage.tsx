@@ -87,8 +87,8 @@ export function LandingPage() {
             시작하세요.
           </h1>
           <p className="landing-intro-copy">
-            번역 작업, 코드 이슈 분석, 프로젝트별 기여 규칙을 한곳에서 확인할 수 있습니다.<br />
-            지금 필요한 도움부터 선택해 순서대로 진행하세요.
+            문서 번역부터 기능 추가까지, 내게 맞는 첫 기여를 단계별로 찾을 수 있습니다.<br />
+            추천 작업을 고르고 프로젝트별 기여 규칙까지 한곳에서 확인하세요.
           </p>
         </div>
       </section>
@@ -101,7 +101,7 @@ export function LandingPage() {
         <div className="landing-section-heading">
           <div>
             <h2 id="landing-feature-heading">필요한 도움을 선택하세요.</h2>
-            <p>문서 번역, 코드 개선, 프로젝트별 제출 규칙 중 지금 필요한 작업부터 확인하세요.</p>
+            <p>첫 기여를 찾거나, 선택한 프로젝트의 제출 규칙을 확인하세요.</p>
           </div>
         </div>
 
@@ -110,27 +110,6 @@ export function LandingPage() {
             type="button"
             className="landing-feature-card"
             style={landingCardStyle(0)}
-            onClick={() => navigate("/translations")}
-          >
-            <div className="landing-feature-visual" aria-hidden="true">
-              <div className="landing-translation-preview">
-                <div><strong>EN</strong><span /><span /><span /></div>
-                <div><strong>KO</strong><span /><span /><span /></div>
-              </div>
-            </div>
-            <div className="landing-feature-body">
-              <span className="landing-feature-label">문서부터 시작한다면</span>
-              <h3>번역 기여</h3>
-              <p>언어별 번역 작업을 찾고 영어 원문과 한국어 문서를 나란히 비교해 실제로 수정해야 할 문단을 확인합니다.</p>
-              <div className="landing-feature-points"><span>언어 필터</span><span>원문 대조</span></div>
-              <span className="landing-feature-link">번역 작업 보기 <Icons.ArrowRight className="w-3 h-3" /></span>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            className="landing-feature-card"
-            style={landingCardStyle(1)}
             onClick={() => navigate("/issues")}
           >
             <div className="landing-feature-visual" aria-hidden="true">
@@ -140,18 +119,18 @@ export function LandingPage() {
               </div>
             </div>
             <div className="landing-feature-body">
-              <span className="landing-feature-label">코드로 기여한다면</span>
-              <h3>코드 이슈</h3>
-              <p>언어, 난이도, 작업 유형으로 코드 이슈를 찾고 관련 PR과 실제 변경 파일을 확인해 작업 범위를 파악합니다.</p>
-              <div className="landing-feature-points"><span>이슈 필터</span><span>PR 분석</span></div>
-              <span className="landing-feature-link">코드 이슈 보기 <Icons.ArrowRight className="w-3 h-3" /></span>
+              <span className="landing-feature-label">무엇부터 할지 고민된다면</span>
+              <h3>첫 기여 찾기</h3>
+              <p>문서 번역부터 테스트, 타입 개선, 버그 수정과 기능 추가까지 권장 순서에 따라 내게 맞는 작업을 찾습니다.</p>
+              <div className="landing-feature-points"><span>단계별 추천</span><span>실제 작업 분석</span></div>
+              <span className="landing-feature-link">첫 기여 찾아보기 <Icons.ArrowRight className="w-3 h-3" /></span>
             </div>
           </button>
 
           <button
             type="button"
             className="landing-feature-card"
-            style={landingCardStyle(2)}
+            style={landingCardStyle(1)}
             onClick={() => navigate("/guides")}
           >
             <div className="landing-feature-visual" aria-hidden="true">

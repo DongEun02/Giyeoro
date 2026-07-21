@@ -6,7 +6,11 @@ import { LanguageFilterBar } from "../components/LanguageFilterBar";
 import { formatGithubDate, getRepoVisual } from "../data/content";
 import { trackAnalyticsEvent } from "../services/analytics";
 
-export function TranslationPage() {
+type TranslationPageProps = {
+  embedded?: boolean;
+};
+
+export function TranslationPage({ embedded = false }: TranslationPageProps) {
   const navigate = useNavigate();
   const { repoKey, docId } = useParams();
   const {
@@ -44,7 +48,7 @@ export function TranslationPage() {
     if (!isDetail || !translationStatusLoaded || translationStatusError) return;
     const project = translationProjects[repoKey];
     if (!project) {
-      navigate("/translations", { replace: true });
+      navigate("/issues", { replace: true });
       return;
     }
     const document = project.docs.find((item: any) => item.id === docId);
@@ -74,7 +78,7 @@ export function TranslationPage() {
           <strong>{translationStatusError ? "번역 문서를 불러오지 못했습니다." : "번역 문서를 불러오고 있습니다."}</strong>
           <span>{translationStatusError || "선택한 언어의 최신 문서 탐색 결과를 확인합니다."}</span>
         </div>
-        <button type="button" className="translation-status-refresh" onClick={() => navigate("/translations")}>목록으로</button>
+        <button type="button" className="translation-status-refresh" onClick={() => navigate("/issues")}>목록으로</button>
       </div>
     );
   }
@@ -83,10 +87,12 @@ export function TranslationPage() {
     <div className="space-y-5 animate-fade-in">
       {!isDetail && (
         <div className="space-y-6">
-          <div className="page-heading pb-2">
-            <h2 className="text-xl font-bold text-[#1f2933]">번역 작업 추천</h2>
-            <p className="text-xs text-[#57606a]">원문과 차이가 있는 문서를 작업 단위로 확인합니다.</p>
-          </div>
+          {!embedded && (
+            <div className="page-heading pb-2">
+              <h2 className="text-xl font-bold text-[#1f2933]">번역 작업 추천</h2>
+              <p className="text-xs text-[#57606a]">원문과 차이가 있는 문서를 작업 단위로 확인합니다.</p>
+            </div>
+          )}
 
           <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
             <div className="relative w-full md:max-w-md">
@@ -173,7 +179,7 @@ export function TranslationPage() {
                 </div>
               )}
 
-              {Object.values(translationProjects).length > 0 && (
+              {!embedded && Object.values(translationProjects).length > 0 && (
                 <div className="translation-project-grid" aria-label="탐색한 번역 프로젝트">
                   {Object.values(translationProjects).map((project: any) => (
                     <div className="translation-project-card" key={project.key}>
@@ -288,7 +294,7 @@ export function TranslationPage() {
           <div>
             <button
               type="button"
-              onClick={() => navigate("/translations")}
+              onClick={() => navigate("/issues")}
               className="inline-flex items-center gap-1 text-xs text-[#3f6fd9] font-semibold hover:underline"
             >
               <Icons.ArrowLeft className="w-3 h-3 text-[#3f6fd9]" />
