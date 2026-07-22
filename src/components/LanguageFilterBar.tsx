@@ -5,14 +5,15 @@ export const LanguageFilterBar = ({
   selectedLanguage,
   onChange,
   accent = "blue",
-  languages = LANGUAGE_FILTERS
+  languages = LANGUAGE_FILTERS,
+  ariaLabel = "언어 선택"
 }: any) => {
   const selectedClasses = accent === "green"
     ? "bg-[#3f6fd9] text-white border-[#3f6fd9]"
     : "bg-[#3f6fd9] text-white border-[#3f6fd9]";
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label={ariaLabel}>
       {languages.map((language: string) => (
         <button
           key={language}

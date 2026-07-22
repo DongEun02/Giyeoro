@@ -42,6 +42,10 @@ const normalizeImportedIssue = ({ issue, repository }: any) => {
       ? issue.relatedPullRequestCount
       : null,
     relatedPullRequestCountTruncated: !!issue.relatedPullRequestCountTruncated,
+    claimCommentCount: Number.isInteger(issue.claimCommentCount)
+      ? issue.claimCommentCount
+      : null,
+    claimCommentReviewTruncated: !!issue.claimCommentReviewTruncated,
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt,
     closedAt: issue.closedAt,

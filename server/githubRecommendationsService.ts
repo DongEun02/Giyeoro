@@ -4,17 +4,24 @@ import {
   parseRepositoryName
 } from "./githubRepositoryService.js";
 import {
-  enrichRelatedPullRequestCounts,
+  enrichIssueAvailability,
   isUnclaimedIssue
 } from "./githubIssueAvailabilityService.js";
 import {
+  getContributionCategoryRepositories,
   getContributionCategory,
-  isContributionCategoryId
+  isContributionCategoryId,
+  isContributionLanguage
 } from "../shared/contributionCategories.js";
-import type { ContributionCategoryId } from "../shared/contributionCategories.js";
+import type {
+  ContributionCategoryId,
+  ContributionLanguage
+} from "../shared/contributionCategories.js";
+import { fetchCatalogRepositories } from "./repositoryCatalogService.js";
 
 type HandlerOptions = {
   githubToken?: string;
+  databaseUrl?: string;
   enforceLoopback?: boolean;
 };
 
@@ -22,10 +29,15 @@ const RESPONSE_CACHE_TTL_MS = 5 * 60 * 1000;
 const CATEGORY_CACHE_TTL_MS = 10 * 60 * 1000;
 const MAX_RECOMMENDATIONS = 18;
 const MAX_CATEGORY_RECOMMENDATIONS = 12;
-const MAX_CATEGORY_CANDIDATES = 24;
+const MAX_CATEGORY_CANDIDATES = 36;
+const MAX_CATEGORY_REPOSITORIES = 10;
 const CATEGORY_ISSUE_MAX_AGE_DAYS = 180;
+const CATEGORY_ISSUE_MAX_COMMENTS = 8;
 const repositoryResponseCache = new Map();
 const categoryResponseCache = new Map<string, { value: any; cachedAt: number }>();
+const categoryCacheKey = (categoryId: ContributionCategoryId, language: ContributionLanguage) => (
+  `${categoryId}:${language}`
+);
 
 const DIFFICULTY_PATTERNS = [
   {
@@ -50,8 +62,8 @@ const ESTIMATED_DIFFICULTY_LABELS = {
 
 const STARTER_SCOPE_PATTERN = /\b(typo|spelling|wording|readme|documentation|docs?|comment|copy|example|sample|tutorial|localization|translation)\b/i;
 const NARROW_CHANGE_PATTERN = /\b(add|adjust|change|fix|remove|rename|update)\b.{0,50}\b(label|message|text|test|docs?|readme|example|comment|warning)\b/i;
-const COMPLEX_SCOPE_PATTERN = /\b(architecture|compiler|parser|serialization|concurrency|parallel|race condition|deadlock|memory leak|security|authentication|authorization|migration|protocol|distributed|infrastructure|rendering engine|database|cross[- ]platform|breaking change)\b/i;
-const INVESTIGATION_PATTERN = /\b(root cause|investigat(e|ion)|unknown|intermittent|flaky|cannot reproduce|can't reproduce|rfc|proposal|design discussion)\b/i;
+const COMPLEX_SCOPE_PATTERN = /\b(architecture|compiler|parser|seriali[sz]ation|deseriali[sz]ation|concurrency|parallel|simd|bytecode|codegen|reflection|classloader|abi|ffi|unsafe|no[-_ ]std|embedded[-_ ]io|race condition|deadlock|memory leak|security|authentication|authorization|migration|protocol|distributed|infrastructure|rendering engine|database|cross[- ]platform|breaking change)\b/i;
+const INVESTIGATION_PATTERN = /\b(root cause|investigat(e|ion)|unknown|intermittent|flaky|cannot reproduce|can't reproduce|rfc|proposal|prototype|design discussion)\b/i;
 const SMALL_SCOPE_LABEL_PATTERN = /\b(size[:/ -]?(xs|small)|small scope|low risk|easy fix)\b/i;
 const LARGE_SCOPE_LABEL_PATTERN = /\b(size[:/ -]?(large|xl)|complex|epic|needs investigation|high risk)\b/i;
 
@@ -216,7 +228,10 @@ const recommendationScore = (issue: any) => {
   if (labels.some((label: any) => /help wanted|contributions welcome|accepting prs/.test(label))) score += 70;
   if (issue.difficultyLevel === "medium") score += 35;
   if (issue.body.length >= 300) score += 15;
-  if (issue.comments <= 15) score += 8;
+  if (issue.comments === 0) score += 18;
+  else if (issue.comments <= 3) score += 10;
+  else if (issue.comments <= 8) score += 4;
+  else score -= Math.min(30, issue.comments);
 
   const ageInDays = Math.max(0, (Date.now() - new Date(issue.updatedAt).getTime()) / 86_400_000);
   score += Math.max(0, 30 - Math.floor(ageInDays / 7));
@@ -281,6 +296,8 @@ const toRecommendation = (rawIssue: any, repository: any, source = "github-repos
     comments: rawIssue.comments || 0,
     relatedPullRequestCount: null as number | null,
     relatedPullRequestCountTruncated: false,
+    claimCommentCount: null as number | null,
+    claimCommentReviewTruncated: false,
     createdAt: rawIssue.created_at,
     updatedAt: rawIssue.updated_at,
     closedAt: rawIssue.closed_at,
@@ -340,7 +357,7 @@ const fetchRepositoryRecommendations = async ({ fullName, githubToken }: any) =>
     }),
     fetchRepositoryContributorFriendliness(repository, githubToken)
   ]);
-  const enrichedIssues = await enrichRelatedPullRequestCounts(issues, githubToken, {
+  const enrichedIssues = await enrichIssueAvailability(issues, githubToken, {
     required: true,
     stopAfterUnclaimed: MAX_RECOMMENDATIONS
   });
@@ -372,6 +389,7 @@ const fetchRepositoryRecommendations = async ({ fullName, githubToken }: any) =>
 const categoryMatchScore = (issue: any, repository: any, categoryId: ContributionCategoryId) => {
   const labelText = (issue.labels || []).map((label: any) => label.name).join(" ");
   const searchable = `${issue.title || ""} ${issue.body || ""} ${labelText}`;
+  const titleAndLabels = `${issue.title || ""} ${labelText}`;
   const specializedRepositories = SPECIALIZED_CATEGORY_REPOSITORIES[categoryId];
   const specializedMatch = specializedRepositories?.has(repository.fullName) || false;
   const patternMatch = CATEGORY_PATTERNS[categoryId].test(searchable);
@@ -380,9 +398,14 @@ const categoryMatchScore = (issue: any, repository: any, categoryId: Contributio
     return specializedMatch ? 120 : 90;
   }
   if (categoryId === "tests" && (issue.workType === "테스트" || patternMatch)) {
+    const focusedMatch = CATEGORY_PATTERNS.tests.test(titleAndLabels);
+    if (!focusedMatch && issue.workType !== "테스트") return null;
     return issue.workType === "테스트" ? 110 : 80;
   }
-  if (categoryId === "types" && (specializedMatch || issue.workType === "타입 개선" || patternMatch)) {
+  if (
+    categoryId === "types"
+    && (specializedMatch || issue.workType === "타입 개선" || CATEGORY_PATTERNS.types.test(titleAndLabels))
+  ) {
     return specializedMatch ? 115 : 85;
   }
   if (categoryId === "bugfix" && (issue.workType === "버그" || patternMatch)) {
@@ -411,7 +434,12 @@ const interleaveIssueLists = (issueLists: any[][], limit: number) => {
   return issues;
 };
 
-const repositorySummary = (repository: any, contributorFriendliness: any, issueCount: number) => ({
+const repositorySummary = (
+  repository: any,
+  contributorFriendliness: any,
+  issueCount: number,
+  deepWikiUrl = ""
+) => ({
   fullName: repository.fullName,
   description: repository.description,
   url: repository.url,
@@ -423,32 +451,52 @@ const repositorySummary = (repository: any, contributorFriendliness: any, issueC
   activity: repository.activity,
   developmentActivity: repository.activity,
   contributorFriendliness,
-  issueCount
+  issueCount,
+  deepWikiUrl
 });
 
 const fetchCategoryRecommendations = async ({
   categoryId,
+  language,
   githubToken,
+  databaseUrl,
   force = false
 }: {
   categoryId: ContributionCategoryId;
+  language: ContributionLanguage;
   githubToken?: string;
+  databaseUrl?: string;
   force?: boolean;
 }) => {
-  const cached = categoryResponseCache.get(categoryId);
+  const cacheKey = categoryCacheKey(categoryId, language);
+  const cached = categoryResponseCache.get(cacheKey);
   if (!force && cached && Date.now() - cached.cachedAt < CATEGORY_CACHE_TTL_MS) {
     return { ...cached.value, cached: true };
   }
 
   const category = getContributionCategory(categoryId);
   if (!category) throw new Error("INVALID_CATEGORY");
+  const curatedRepositoryNames = getContributionCategoryRepositories(categoryId, language);
+  const catalogRepositories = await fetchCatalogRepositories({
+    databaseUrl,
+    language,
+    limit: MAX_CATEGORY_REPOSITORIES
+  });
+  const deepWikiUrlByRepository = new Map(
+    catalogRepositories.map(repository => [repository.fullName.toLowerCase(), repository.deepWikiUrl])
+  );
+  const repositoryNames = [...new Set([
+    ...curatedRepositoryNames,
+    ...catalogRepositories.map(repository => repository.fullName)
+  ])].slice(0, MAX_CATEGORY_REPOSITORIES);
+  if (repositoryNames.length === 0) throw new Error("CATEGORY_LANGUAGE_UNAVAILABLE");
 
   const metadataResults = await Promise.allSettled(
-    category.repositoryNames.map(fullName => fetchOpenSourceRepository(fullName, githubToken))
+    repositoryNames.map(fullName => fetchOpenSourceRepository(fullName, githubToken))
   );
   const failedRepositories = metadataResults.flatMap((result, index) => (
     result.status === "rejected"
-      ? [{ repository: category.repositoryNames[index], reason: "저장소 상태를 확인하지 못했습니다." }]
+      ? [{ repository: repositoryNames[index], reason: "저장소 상태를 확인하지 못했습니다." }]
       : []
   ));
   const activeRepositories = metadataResults
@@ -458,8 +506,7 @@ const fetchCategoryRecommendations = async ({
     .sort((left, right) => {
       const activityScore = (repository: any) => repository.activity.level === "active" ? 2 : 1;
       return activityScore(right) - activityScore(left)
-        || Number(!!right.contributionGuideUrl) - Number(!!left.contributionGuideUrl)
-        || right.stars - left.stars;
+        || Number(!!right.contributionGuideUrl) - Number(!!left.contributionGuideUrl);
     });
   if (activeRepositories.length === 0) throw new Error("CATEGORY_NO_ACTIVE_REPOSITORIES");
 
@@ -488,8 +535,7 @@ const fetchCategoryRecommendations = async ({
       const activityScore = (repository: any) => repository.activity.level === "active" ? 2 : 1;
       return activityScore(right.repository) - activityScore(left.repository)
         || contributorScore(right.contributorFriendliness) - contributorScore(left.contributorFriendliness)
-        || Number(!!right.repository.contributionGuideUrl) - Number(!!left.repository.contributionGuideUrl)
-        || right.repository.stars - left.repository.stars;
+        || Number(!!right.repository.contributionGuideUrl) - Number(!!left.repository.contributionGuideUrl);
     });
   const matchedIssueLists = rankedRepositories.map(({ repository, issueResult: result }) => {
     if (result.status === "rejected") {
@@ -499,6 +545,8 @@ const fetchCategoryRecommendations = async ({
 
     return result.value
       .filter(isRecentlyUpdatedIssue)
+      .filter((issue: any) => issue.comments <= CATEGORY_ISSUE_MAX_COMMENTS)
+      .filter((issue: any) => issue.difficultyLevel !== "challenging")
       .flatMap((issue: any) => {
         const matchScore = categoryMatchScore(issue, repository, categoryId);
         if (matchScore === null) return [];
@@ -515,7 +563,7 @@ const fetchCategoryRecommendations = async ({
   });
 
   const candidates = interleaveIssueLists(matchedIssueLists, MAX_CATEGORY_CANDIDATES);
-  const enrichedIssues = await enrichRelatedPullRequestCounts(candidates, githubToken, {
+  const enrichedIssues = await enrichIssueAvailability(candidates, githubToken, {
     required: true,
     stopAfterUnclaimed: MAX_CATEGORY_RECOMMENDATIONS
   });
@@ -535,7 +583,8 @@ const fetchCategoryRecommendations = async ({
     repositorySummary(
       repository,
       contributorFriendliness,
-      issueCounts.get(repository.fullName) || 0
+      issueCounts.get(repository.fullName) || 0,
+      deepWikiUrlByRepository.get(repository.fullName.toLowerCase()) || ""
     )
   ));
   const healthByRepository = new Map(repositorySummaries.map(repository => [repository.fullName, repository]));
@@ -543,6 +592,7 @@ const fetchCategoryRecommendations = async ({
     const repositoryHealth = healthByRepository.get(issue.repo);
     return toPublicRecommendation({
       ...issue,
+      deepWikiUrl: deepWikiUrlByRepository.get(issue.repo.toLowerCase()) || "",
       repositoryActivity: repositoryHealth?.activity || issue.repositoryActivity,
       contributorFriendliness: repositoryHealth?.contributorFriendliness || null
     });
@@ -554,22 +604,29 @@ const fetchCategoryRecommendations = async ({
       stage: category.stage,
       title: category.title,
       stageLabel: category.stageLabel,
-      description: category.description
+      description: category.description,
+      language
     },
     issues,
     repositories: repositorySummaries,
     failedRepositories,
     criteria: {
       activityWindowDays: 90,
+      maximumDiscussionComments: CATEGORY_ISSUE_MAX_COMMENTS,
+      deepWikiCatalog: catalogRepositories.length > 0,
+      repositorySizeExcluded: false,
       requiresNoAssignee: true,
       requiresNoRelatedPullRequest: true,
+      requiresNoClaimComment: true,
+      excludesTruncatedCommentReview: true,
+      excludesChallengingIssues: true,
       prioritizesContributionGuide: true
     },
     loadedAt: new Date(loadedAtMs).toISOString(),
     loadedAtMs,
     cached: false
   };
-  categoryResponseCache.set(categoryId, { value, cachedAt: Date.now() });
+  categoryResponseCache.set(cacheKey, { value, cachedAt: Date.now() });
   return value;
 };
 
@@ -585,8 +642,11 @@ const errorMessage = (error: any) => {
   if (message === "REPOSITORY_INACTIVE") return [422, "보관되었거나 비활성화된 저장소입니다."];
   if (message === "GITHUB_RATE_LIMIT") return [429, "GitHub API 요청 한도에 도달했습니다."];
   if (message === "GITHUB_TOKEN_REQUIRED") return [503, "추천 가능한 이슈를 검증하려면 GitHub API 토큰이 필요합니다."];
-  if (message === "GITHUB_RELATED_PRS_UNAVAILABLE") return [502, "이슈에 연결된 Pull Request를 확인하지 못했습니다."];
+  if (message === "GITHUB_ISSUE_AVAILABILITY_UNAVAILABLE") {
+    return [502, "이슈의 연결 Pull Request와 작업 의사 댓글을 확인하지 못했습니다."];
+  }
   if (message === "CATEGORY_NO_ACTIVE_REPOSITORIES") return [404, "현재 활동 기준을 충족하는 저장소를 찾지 못했습니다."];
+  if (message === "CATEGORY_LANGUAGE_UNAVAILABLE") return [404, "선택한 언어의 추천 라이브러리를 찾지 못했습니다."];
   if (error?.name === "TimeoutError" || /timeout/i.test(message)) {
     return [504, "GitHub 이슈 조회 시간이 초과됐습니다."];
   }
@@ -596,6 +656,7 @@ const errorMessage = (error: any) => {
 export const handleCategoryIssuesRequest = async (request: any, response: any, options: HandlerOptions = {}) => {
   const {
     githubToken = process.env.GITHUB_TOKEN,
+    databaseUrl = process.env.DATABASE_URL,
     enforceLoopback = false
   } = options;
 
@@ -614,13 +675,25 @@ export const handleCategoryIssuesRequest = async (request: any, response: any, o
     jsonResponse(response, 400, { error: "지원하지 않는 기여 카테고리입니다." });
     return;
   }
+  const language = requestUrl.searchParams.get("language") || "";
+  if (!isContributionLanguage(language)) {
+    jsonResponse(response, 400, { error: "지원하지 않는 기여 언어입니다." });
+    return;
+  }
+  const cacheKey = categoryCacheKey(categoryId, language);
 
   try {
     const force = requestUrl.searchParams.get("refresh") === "1";
-    const result = await fetchCategoryRecommendations({ categoryId, githubToken, force });
+    const result = await fetchCategoryRecommendations({
+      categoryId,
+      language,
+      githubToken,
+      databaseUrl,
+      force
+    });
     jsonResponse(response, 200, result);
   } catch (error) {
-    const stale = categoryResponseCache.get(categoryId);
+    const stale = categoryResponseCache.get(cacheKey);
     const caughtMessage = error instanceof Error ? error.message : "";
     if (stale && ["GITHUB_RATE_LIMIT", "GITHUB_FETCH_FAILED"].includes(caughtMessage)) {
       jsonResponse(response, 200, { ...stale.value, cached: true, stale: true });

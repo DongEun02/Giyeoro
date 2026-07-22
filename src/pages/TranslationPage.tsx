@@ -8,9 +8,13 @@ import { trackAnalyticsEvent } from "../services/analytics";
 
 type TranslationPageProps = {
   embedded?: boolean;
+  showLanguageFilter?: boolean;
 };
 
-export function TranslationPage({ embedded = false }: TranslationPageProps) {
+export function TranslationPage({
+  embedded = false,
+  showLanguageFilter = true
+}: TranslationPageProps) {
   const navigate = useNavigate();
   const { repoKey, docId } = useParams();
   const {
@@ -116,20 +120,22 @@ export function TranslationPage({ embedded = false }: TranslationPageProps) {
             </div>
           </div>
 
-          <div className="filter-panel p-3 space-y-2">
-            <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider">언어 필터</span>
-            <LanguageFilterBar
-              selectedLanguage={translationLanguage}
-              onChange={(language: string) => {
-                trackAnalyticsEvent("language_filter_select", {
-                  content_type: "translation",
-                  language
-                });
-                setTranslationLanguage(language);
-              }}
-            />
-            <p className="text-[11px] text-[#6e7781]">언어를 선택하면 검증된 한국어 번역 저장소에서 최근 변경된 문서를 탐색합니다.</p>
-          </div>
+          {showLanguageFilter && (
+            <div className="filter-panel p-3 space-y-2">
+              <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider">언어 필터</span>
+              <LanguageFilterBar
+                selectedLanguage={translationLanguage}
+                onChange={(language: string) => {
+                  trackAnalyticsEvent("language_filter_select", {
+                    content_type: "translation",
+                    language
+                  });
+                  setTranslationLanguage(language);
+                }}
+              />
+              <p className="text-[11px] text-[#6e7781]">언어를 선택하면 검증된 한국어 번역 저장소에서 최근 변경된 문서를 탐색합니다.</p>
+            </div>
+          )}
 
           {translationStatusLoading && (
             <div className="recommendation-status" role="status">

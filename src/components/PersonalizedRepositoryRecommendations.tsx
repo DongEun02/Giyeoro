@@ -172,9 +172,9 @@ export function PersonalizedRepositoryRecommendations({
 
       <div className="personalized-result-heading">
         <div>
-          <span>경험과 저장소 상태를 함께 반영</span>
-          <h3>도전해 볼 만한 프로젝트</h3>
-          <p>이미 소유하거나 최근 참여한 저장소는 제외하고 새로운 프로젝트를 추천합니다.</p>
+          <span>경험과 라이브러리 상태를 함께 반영</span>
+          <h3>도전해 볼 만한 오픈소스 라이브러리</h3>
+          <p>대형 프레임워크·컴파일러보다 사용 경험과 맞는 단일 목적 라이브러리를 우선합니다.</p>
         </div>
         <strong>{result.recommendations.length}개 추천</strong>
       </div>
@@ -233,7 +233,7 @@ export function PersonalizedRepositoryRecommendations({
 
       <div className="personalized-criteria-note">
         <Icons.Check className="w-4 h-4 shrink-0" />
-        <span>공개 데이터만 분석 · 최근 {result.criteria.repositoryActivityWindowDays}일 내 활동 · 라이선스와 기여 가이드 · 입문 이슈 · 외부 PR 응답 확인</span>
+        <span>공개 데이터만 분석 · 라이브러리 중심 · 최근 {result.criteria.repositoryActivityWindowDays}일 내 활동 · 라이선스와 기여 가이드 · 입문 이슈 · 외부 PR 응답 확인</span>
       </div>
     </div>
   );

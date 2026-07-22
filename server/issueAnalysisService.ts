@@ -1,6 +1,6 @@
 import { DEFAULT_NVIDIA_MODEL, generateNvidiaJson } from "./nvidiaClient.js";
 import { fetchOpenSourceRepository } from "./githubRepositoryService.js";
-import { enrichRelatedPullRequestCounts } from "./githubIssueAvailabilityService.js";
+import { enrichIssueAvailability } from "./githubIssueAvailabilityService.js";
 
 type AnalysisHandlerOptions = {
   apiKey?: string;
@@ -340,8 +340,8 @@ export const handleGithubIssueRequest = async (request: any, response: any, opti
   try {
     const repository = await fetchVerifiedRepository(parsedIssue, githubToken);
     const issue = await fetchGithubIssue(parsedIssue, githubToken);
-    const [issueWithPullRequests] = await enrichRelatedPullRequestCounts([issue], githubToken);
-    jsonResponse(response, 200, { issue: issueWithPullRequests, repository });
+    const [issueWithAvailability] = await enrichIssueAvailability([issue], githubToken);
+    jsonResponse(response, 200, { issue: issueWithAvailability, repository });
   } catch (error) {
     const [status, message] = errorMessage(error);
     console.error(`[GitHub issue] ${status}: ${message}`);

@@ -5,6 +5,17 @@ export type ContributionCategoryId =
   | "bugfix"
   | "feature";
 
+export type ContributionLanguage =
+  | "JavaScript"
+  | "TypeScript"
+  | "HTML/CSS"
+  | "Python"
+  | "Java"
+  | "Kotlin"
+  | "Swift"
+  | "Go"
+  | "Rust";
+
 export type ContributionCategory = {
   id: ContributionCategoryId;
   stage: 1 | 2 | 3;
@@ -34,13 +45,13 @@ export const CONTRIBUTION_CATEGORIES: readonly ContributionCategory[] = [
     stage: 2,
     title: "테스트 코드",
     stageLabel: "동작 이해하기",
-    description: "기존 동작을 테스트로 표현하며 코드 구조와 실행 흐름을 익힙니다.",
+    description: "프로젝트의 기존 동작을 작은 테스트로 표현하며 실행 흐름을 익힙니다.",
     repositoryNames: [
-      "vitest-dev/vitest",
-      "pytest-dev/pytest",
-      "junit-team/junit5",
-      "kotest/kotest",
-      "testing-library/react-testing-library"
+      "testing-library/dom-testing-library",
+      "mockito/mockito",
+      "stretchr/testify",
+      "HypothesisWorks/hypothesis",
+      "assertj/assertj"
     ]
   },
   {
@@ -50,11 +61,12 @@ export const CONTRIBUTION_CATEGORIES: readonly ContributionCategory[] = [
     stageLabel: "구조 이해하기",
     description: "타입 정의와 경계 조건을 다듬으며 코드의 의도를 파악합니다.",
     repositoryNames: [
-      "DefinitelyTyped/DefinitelyTyped",
-      "microsoft/TypeScript",
-      "typescript-eslint/typescript-eslint",
-      "python/typeshed",
-      "Kotlin/kotlinx.serialization"
+      "colinhacks/zod",
+      "axios/axios",
+      "TanStack/query",
+      "testing-library/react-testing-library",
+      "marshmallow-code/marshmallow",
+      "python-attrs/attrs"
     ]
   },
   {
@@ -62,13 +74,13 @@ export const CONTRIBUTION_CATEGORIES: readonly ContributionCategory[] = [
     stage: 3,
     title: "버그 수정",
     stageLabel: "문제 해결하기",
-    description: "재현 가능한 문제의 원인을 찾고 기존 동작을 안전하게 고칩니다.",
+    description: "프로젝트 규모와 관계없이 재현 가능하고 범위가 분명한 문제를 안전하게 고칩니다.",
     repositoryNames: [
-      "vitejs/vite",
-      "spring-projects/spring-boot",
-      "JetBrains/kotlin",
-      "facebook/react",
-      "nodejs/node"
+      "immerjs/immer",
+      "go-playground/validator",
+      "google/gson",
+      "square/moshi",
+      "coil-kt/coil"
     ]
   },
   {
@@ -76,16 +88,76 @@ export const CONTRIBUTION_CATEGORIES: readonly ContributionCategory[] = [
     stage: 3,
     title: "기능 추가",
     stageLabel: "설계에 참여하기",
-    description: "요구사항과 기존 구조를 함께 고려해 새로운 동작을 제안하고 구현합니다.",
+    description: "요구사항과 기존 구조를 살펴 범위가 분명한 작은 기능을 구현합니다.",
     repositoryNames: [
-      "vercel/next.js",
-      "spring-projects/spring-boot",
-      "android/nowinandroid",
-      "vitejs/vite",
-      "Kotlin/kotlinx.coroutines"
+      "floating-ui/floating-ui",
+      "pallets/click",
+      "marshmallow-code/marshmallow",
+      "faker-js/faker",
+      "go-playground/validator"
     ]
   }
 ] as const;
+
+const DOCUMENTATION_LANGUAGES: readonly ContributionLanguage[] = [
+  "JavaScript",
+  "TypeScript",
+  "HTML/CSS",
+  "Python",
+  "Java",
+  "Kotlin",
+  "Swift",
+  "Go",
+  "Rust"
+];
+
+const REPOSITORY_LANGUAGES: Readonly<Record<string, readonly ContributionLanguage[]>> = {
+  "mdn/translated-content": ["JavaScript", "HTML/CSS"],
+  "reactjs/ko.react.dev": ["JavaScript", "TypeScript"],
+  "vuejs-translations/docs-ko": ["JavaScript", "TypeScript"],
+  "python/python-docs-ko": ["Python"],
+  "rust-kr/doc.rust-kr.org": ["Rust"],
+  "testing-library/dom-testing-library": ["JavaScript"],
+  "mockito/mockito": ["Java"],
+  "stretchr/testify": ["Go"],
+  "HypothesisWorks/hypothesis": ["Python"],
+  "assertj/assertj": ["Java"],
+  "colinhacks/zod": ["TypeScript"],
+  "axios/axios": ["JavaScript"],
+  "TanStack/query": ["TypeScript"],
+  "testing-library/react-testing-library": ["TypeScript"],
+  "marshmallow-code/marshmallow": ["Python"],
+  "python-attrs/attrs": ["Python"],
+  "immerjs/immer": ["JavaScript"],
+  "go-playground/validator": ["Go"],
+  "google/gson": ["Java"],
+  "square/moshi": ["Kotlin"],
+  "coil-kt/coil": ["Kotlin"],
+  "floating-ui/floating-ui": ["TypeScript"],
+  "pallets/click": ["Python"],
+  "faker-js/faker": ["TypeScript"]
+};
+
+export const isContributionLanguage = (value: string): value is ContributionLanguage => (
+  DOCUMENTATION_LANGUAGES.includes(value as ContributionLanguage)
+);
+
+export const getContributionCategoryLanguages = (
+  categoryId: ContributionCategoryId
+): readonly ContributionLanguage[] => {
+  return getContributionCategory(categoryId) ? DOCUMENTATION_LANGUAGES : [];
+};
+
+export const getContributionCategoryRepositories = (
+  categoryId: ContributionCategoryId,
+  language: ContributionLanguage
+) => {
+  const category = getContributionCategory(categoryId);
+  if (!category) return [];
+  return category.repositoryNames.filter(name => (
+    (REPOSITORY_LANGUAGES[name] || []).includes(language)
+  ));
+};
 
 export const getContributionCategory = (categoryId: string) => (
   CONTRIBUTION_CATEGORIES.find(category => category.id === categoryId) || null

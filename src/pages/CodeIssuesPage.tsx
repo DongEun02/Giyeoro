@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useOssApp } from "../app/OssAppContext";
 import { Icons } from "../components/Icons";
 import { IssueFilters, IssueRecommendationGrid } from "../components/IssueExplorer";
+import { LanguageFilterBar } from "../components/LanguageFilterBar";
 import { PersonalizedRepositoryRecommendations } from "../components/PersonalizedRepositoryRecommendations";
 import { formatGithubDate } from "../data/content";
 import { CONTRIBUTION_CATEGORIES } from "../../shared/contributionCategories";
@@ -56,6 +57,9 @@ export function CodeIssuesPage() {
     setFeatureSourceMode,
     selectedContributionCategory,
     selectContributionCategory,
+    selectedContributionLanguage,
+    contributionLanguageOptions,
+    selectContributionLanguage,
     categoryIssues,
     categoryRepositories,
     categoryRecommendationFailures,
@@ -104,6 +108,15 @@ export function CodeIssuesPage() {
     ? issueData.relatedPullRequestCount
     : null;
   const hasRelatedPullRequests = relatedPullRequestCount !== null && relatedPullRequestCount > 0;
+  const claimCommentCount = Number.isInteger(issueData?.claimCommentCount)
+    ? issueData.claimCommentCount
+    : null;
+  const hasClaimComments = claimCommentCount !== null && claimCommentCount > 0;
+  const hasIncompleteCommentReview = !!issueData?.claimCommentReviewTruncated;
+  const isIssuePossiblyClaimed = issueAssignees.length > 0
+    || hasRelatedPullRequests
+    || hasClaimComments
+    || hasIncompleteCommentReview;
   const activeContributionCategory = CONTRIBUTION_CATEGORIES.find(
     category => category.id === selectedContributionCategory
   ) || CONTRIBUTION_CATEGORIES[0];
@@ -226,17 +239,21 @@ export function CodeIssuesPage() {
             </div>
 
             <div
-              className={`issue-assignment-status ${issueAssignees.length > 0 || hasRelatedPullRequests ? "issue-assignment-status-assigned" : "issue-assignment-status-available"}`}
+              className={`issue-assignment-status ${isIssuePossiblyClaimed ? "issue-assignment-status-assigned" : "issue-assignment-status-available"}`}
               role="status"
             >
-              {issueAssignees.length > 0 || hasRelatedPullRequests ? (
+              {isIssuePossiblyClaimed ? (
                 <>
                   <Icons.Alert className="w-4 h-4 shrink-0" />
                   <div className="issue-assignment-copy">
                     <strong>
                       {issueAssignees.length > 0
                         ? `담당자 ${issueAssignees.length}명이 지정되어 있습니다.`
-                        : `연관 Pull Request ${relatedPullRequestCount}개가 있습니다.`}
+                        : hasRelatedPullRequests
+                          ? `연관 Pull Request ${relatedPullRequestCount}개가 있습니다.`
+                          : hasClaimComments
+                            ? `작업 의사를 밝힌 댓글 ${claimCommentCount}개가 있습니다.`
+                            : "댓글이 많아 전체 작업 의사를 확인하지 못했습니다."}
                     </strong>
                     <span>이미 작업 중일 수 있으니 GitHub에서 진행 상황을 먼저 확인하세요.</span>
                   </div>
@@ -262,8 +279,8 @@ export function CodeIssuesPage() {
                 <>
                   <Icons.Check className="w-4 h-4 shrink-0" />
                   <div className="issue-assignment-copy">
-                    <strong>현재 지정된 담당자가 없습니다.</strong>
-                    <span>작업을 시작하기 전에 최신 댓글과 연결된 PR을 확인하세요.</span>
+                    <strong>현재 담당자·연관 PR·작업 의사 댓글이 없습니다.</strong>
+                    <span>최근 댓글까지 확인한 결과이며, 작업 시작 직전에 GitHub 상태를 한 번 더 확인하세요.</span>
                   </div>
                 </>
               )}
@@ -292,6 +309,17 @@ export function CodeIssuesPage() {
                 </span>
                 <Icons.ArrowRight className="w-4 h-4 shrink-0" />
               </button>
+            )}
+
+            {issueData.deepWikiUrl && (
+              <a href={issueData.deepWikiUrl} target="_blank" rel="noreferrer" className="issue-contribution-guide-link">
+                <Icons.BookOpen className="w-4 h-4 shrink-0" />
+                <span>
+                  <strong>DeepWiki에서 코드베이스 익히기</strong>
+                  <small>이슈를 시작하기 전에 {issueData.repo}의 구조와 주요 흐름을 살펴봅니다.</small>
+                </span>
+                <Icons.ArrowRight className="w-4 h-4 shrink-0" />
+              </a>
             )}
           </header>
 
@@ -432,30 +460,55 @@ export function CodeIssuesPage() {
                 ))}
               </ol>
 
+              <div className="filter-panel p-3 space-y-2">
+                <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider">
+                  먼저 기여할 언어를 선택하세요
+                </span>
+                <LanguageFilterBar
+                  selectedLanguage={selectedContributionLanguage}
+                  onChange={selectContributionLanguage}
+                  languages={contributionLanguageOptions}
+                  ariaLabel={`${activeContributionCategory.title} 추천 언어 선택`}
+                />
+                <p className="text-[11px] text-[#6e7781]">
+                  DeepWiki에 등록된 오픈소스 프로젝트에서 선택한 언어의 추천 이슈를 찾습니다.
+                </p>
+              </div>
+
               <div className="category-selection-note" role="status">
-                <Icons.Check className="w-4 h-4 shrink-0" />
+                {selectedContributionLanguage
+                  ? <Icons.Check className="w-4 h-4 shrink-0" />
+                  : <Icons.Alert className="w-4 h-4 shrink-0" />}
                 <span>
-                  <strong>{activeContributionCategory.title}</strong>
-                  {selectedContributionCategory === "documentation"
-                    ? "검증된 한국어 번역 저장소에서 최근 변경된 원문과 번역 문서를 비교합니다."
-                    : "최근 90일 내 활동 · 기여 가이드와 외부 PR 응답 우선 · 담당자 없음 · 연관 PR 없음 기준으로 선별합니다."}
+                  <strong>
+                    {selectedContributionLanguage
+                      ? `${selectedContributionLanguage} · ${activeContributionCategory.title}`
+                      : `${activeContributionCategory.title} 언어 선택 대기`}
+                  </strong>
+                  {!selectedContributionLanguage
+                    ? "위에서 언어를 선택하면 추천 탐색을 시작합니다."
+                    : selectedContributionCategory === "documentation"
+                      ? "선택한 언어의 검증된 한국어 번역 저장소에서 최근 변경 문서를 비교합니다."
+                      : "프로젝트 크기와 관계없이 입문 난이도 우선 · 담당자·연관 PR·작업 의사 댓글 없음 기준으로 선별합니다."}
                 </span>
               </div>
             </section>
 
-            {selectedContributionCategory === "documentation" && <TranslationPage embedded />}
+            {selectedContributionCategory === "documentation" && selectedContributionLanguage && (
+              <TranslationPage embedded showLanguageFilter={false} />
+            )}
 
-            {selectedContributionCategory !== "documentation" && categoryIssuesLoading && (
+            {selectedContributionCategory !== "documentation" && selectedContributionLanguage && categoryIssuesLoading && (
               <div className="recommendation-status" role="status">
                 <span className="recommendation-status-spinner" aria-hidden="true" />
                 <div>
                   <strong>활동 중인 저장소에서 {activeContributionCategory.title} 이슈를 찾고 있습니다.</strong>
-                  <span>최근 push, 기여 가이드, 담당자와 연관 Pull Request를 함께 확인합니다.</span>
+                  <span>DeepWiki 후보의 최근 활동, 이슈 난이도, 담당자, 연관 PR과 작업 의사 댓글을 함께 확인합니다.</span>
                 </div>
               </div>
             )}
 
-            {selectedContributionCategory !== "documentation" && categoryIssuesError && !categoryIssuesLoading && (
+            {selectedContributionCategory !== "documentation" && selectedContributionLanguage && categoryIssuesError && !categoryIssuesLoading && (
               <div className="recommendation-status recommendation-status-error" role="alert">
                 <Icons.Alert className="w-4 h-4 shrink-0" />
                 <div><strong>추천 이슈를 불러오지 못했습니다.</strong><span>{categoryIssuesError}</span></div>
@@ -463,7 +516,7 @@ export function CodeIssuesPage() {
               </div>
             )}
 
-            {selectedContributionCategory !== "documentation" && !categoryIssuesLoading && !categoryIssuesError && (
+            {selectedContributionCategory !== "documentation" && selectedContributionLanguage && !categoryIssuesLoading && !categoryIssuesError && (
               <>
                 <div className="category-result-heading">
                   <div>
@@ -481,15 +534,15 @@ export function CodeIssuesPage() {
                 {categoryRepositories.length > 0 && (
                   <section className="category-repository-section" aria-labelledby="category-repository-heading">
                     <div className="category-repository-heading">
-                      <h4 id="category-repository-heading">현재 추천에 포함된 저장소</h4>
-                      <span>GitHub의 최신 상태를 기준으로 표시합니다.</span>
+                      <h4 id="category-repository-heading">현재 추천에 포함된 오픈소스 프로젝트</h4>
+                      <span>프로젝트 크기는 제한하지 않고, 실제 이슈의 작업 범위와 난이도를 판단합니다.</span>
                     </div>
                     <div className="category-repository-list">
                       {categoryRepositories.map((repo: any) => (
-                        <a key={repo.fullName} href={repo.url} target="_blank" rel="noreferrer" className="category-repository-card">
+                        <div key={repo.fullName} className="category-repository-card">
                           <img src={repo.ownerAvatarUrl} alt="" />
                           <span>
-                            <strong>{repo.fullName}</strong>
+                            <a href={repo.url} target="_blank" rel="noreferrer"><strong>{repo.fullName}</strong></a>
                             <small>
                               {repo.language} · 추천 이슈 {repo.issueCount}개
                               {repo.contributorFriendliness?.label ? ` · 기여 친화도 ${repo.contributorFriendliness.label}` : ""}
@@ -499,7 +552,12 @@ export function CodeIssuesPage() {
                             <i aria-hidden="true" />
                             {repo.activity?.label || "확인 불가"}
                           </span>
-                        </a>
+                          {repo.deepWikiUrl && (
+                            <a className="category-repository-deepwiki" href={repo.deepWikiUrl} target="_blank" rel="noreferrer">
+                              DeepWiki로 코드 익히기 <Icons.ArrowRight className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </section>
@@ -532,6 +590,7 @@ export function CodeIssuesPage() {
                   onDifficultyChange={setSelectedDifficulty}
                   issueType={selectedIssueType}
                   onIssueTypeChange={setSelectedIssueType}
+                  showLanguage={false}
                   showIssueType={false}
                 />
                 <IssueRecommendationGrid
@@ -550,7 +609,7 @@ export function CodeIssuesPage() {
           <div className="space-y-5">
             <section className="issue-import-panel" aria-labelledby="repository-search-heading">
               <h3 id="repository-search-heading">저장소 추천 이슈 찾기</h3>
-              <p>GitHub의 <code>owner/repository</code> 이름을 입력하면 담당자와 연관 Pull Request가 없는 열린 이슈를 선별합니다.</p>
+              <p>GitHub의 <code>owner/repository</code> 이름을 입력하면 담당자·연관 Pull Request·작업 의사 댓글이 없는 열린 이슈를 선별합니다.</p>
               <form className="issue-import-form" onSubmit={loadRepositoryRecommendations}>
                 <div className="issue-import-input-wrap">
                   <Icons.Github className="w-4 h-4" />
@@ -579,7 +638,7 @@ export function CodeIssuesPage() {
             {repositoryIssuesLoading && (
               <div className="recommendation-status" role="status">
                 <span className="recommendation-status-spinner" aria-hidden="true" />
-                <div><strong>저장소의 열린 이슈를 확인하고 있습니다.</strong><span>라벨, 담당자, 본문 내용과 최근 업데이트를 기준으로 정렬합니다.</span></div>
+                <div><strong>저장소의 열린 이슈를 확인하고 있습니다.</strong><span>라벨, 난이도, 담당자, 연결 PR과 작업 의사 댓글을 기준으로 정렬합니다.</span></div>
               </div>
             )}
 

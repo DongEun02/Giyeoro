@@ -42,7 +42,18 @@ import {
   updateRemoteWorkspaceStatus,
   upsertWorkspaceItem
 } from "./services/workspace";
-import type { ContributionCategoryId } from "../shared/contributionCategories";
+import {
+  getContributionCategoryLanguages
+} from "../shared/contributionCategories";
+import type {
+  ContributionCategoryId,
+  ContributionLanguage
+} from "../shared/contributionCategories";
+
+const categoryResultKey = (
+  category: ContributionCategoryId,
+  language: ContributionLanguage
+) => `${category}:${language}`;
 
 export default function App() {
   const location = useLocation();
@@ -102,6 +113,7 @@ export default function App() {
   const [featureRepoLanguage, setFeatureRepoLanguage] = useState("All");
   const [featureSourceMode, setFeatureSourceMode] = useState('category'); // 'category' | 'personalized' | 'repository' | 'issue-url'
   const [selectedContributionCategory, setSelectedContributionCategory] = useState<ContributionCategoryId>("documentation");
+  const [selectedContributionLanguage, setSelectedContributionLanguage] = useState<ContributionLanguage | "">("");
   const [categoryRecommendationResults, setCategoryRecommendationResults] = useState<Record<string, any>>({});
   const [categoryIssuesLoading, setCategoryIssuesLoading] = useState(false);
   const [categoryIssuesError, setCategoryIssuesError] = useState("");
@@ -260,11 +272,13 @@ export default function App() {
       view !== 'feature'
       || featureSourceMode !== 'category'
       || selectedContributionCategory === 'documentation'
+      || !selectedContributionLanguage
     ) return undefined;
 
+    const resultKey = categoryResultKey(selectedContributionCategory, selectedContributionLanguage);
     const force = categoryRefreshVersion > handledCategoryRefresh.current;
     handledCategoryRefresh.current = categoryRefreshVersion;
-    if (!force && categoryRecommendationResults[selectedContributionCategory]) return undefined;
+    if (!force && categoryRecommendationResults[resultKey]) return undefined;
 
     const controller = new AbortController();
     const requestTimeout = setTimeout(() => controller.abort(), 75_000);
@@ -272,13 +286,17 @@ export default function App() {
     setCategoryIssuesLoading(true);
     setCategoryIssuesError("");
 
-    fetchCategoryIssues(selectedContributionCategory, { force, signal: controller.signal })
+    fetchCategoryIssues(selectedContributionCategory, {
+      language: selectedContributionLanguage,
+      force,
+      signal: controller.signal
+    })
       .then(result => {
         if (!active) return;
         clearTimeout(requestTimeout);
         setCategoryRecommendationResults(current => ({
           ...current,
-          [selectedContributionCategory]: result
+          [resultKey]: result
         }));
         setCategoryIssuesLoading(false);
       })
@@ -302,6 +320,7 @@ export default function App() {
     view,
     featureSourceMode,
     selectedContributionCategory,
+    selectedContributionLanguage,
     categoryRefreshVersion,
     categoryRecommendationResults
   ]);
@@ -350,6 +369,11 @@ export default function App() {
         && selectedContributionCategory === 'documentation'
       );
     if (!isTranslationDiscoveryView) return undefined;
+    if (
+      view === 'feature'
+      && selectedContributionCategory === 'documentation'
+      && !selectedContributionLanguage
+    ) return undefined;
 
     const controller = new AbortController();
     const requestTimeout = setTimeout(() => controller.abort(), 100_000);
@@ -405,6 +429,7 @@ export default function App() {
     view,
     featureSourceMode,
     selectedContributionCategory,
+    selectedContributionLanguage,
     translationLanguage,
     translationStatusRefreshVersion
   ]);
@@ -622,18 +647,36 @@ export default function App() {
       item_id: category
     });
     setSelectedContributionCategory(category);
+    setSelectedContributionLanguage("");
+    setCategoryIssuesError("");
+    resetFeatureIssueFilters();
+  };
+
+  const selectContributionLanguage = (language: ContributionLanguage) => {
+    trackAnalyticsEvent("language_filter_select", {
+      content_type: "contribution_category",
+      category: selectedContributionCategory,
+      language
+    });
+    setSelectedContributionLanguage(language);
+    if (selectedContributionCategory === "documentation") {
+      setTranslationLanguage(language);
+    }
+    setCategoryIssuesError("");
     resetFeatureIssueFilters();
   };
 
   const refreshCategoryRecommendations = () => {
+    if (!selectedContributionLanguage) return;
     trackAnalyticsEvent("content_refresh", {
       content_type: "category_issues",
-      category: selectedContributionCategory
+      category: selectedContributionCategory,
+      language: selectedContributionLanguage
     });
     setCategoryIssuesError("");
     setCategoryRecommendationResults(current => {
       const updated = { ...current };
-      delete updated[selectedContributionCategory];
+      delete updated[categoryResultKey(selectedContributionCategory, selectedContributionLanguage)];
       return updated;
     });
     setCategoryRefreshVersion(version => version + 1);
@@ -870,7 +913,12 @@ export default function App() {
     return matchSearch && matchLanguage;
   });
 
-  const selectedCategoryResult = categoryRecommendationResults[selectedContributionCategory] || null;
+  const selectedCategoryResult = selectedContributionLanguage
+    ? categoryRecommendationResults[categoryResultKey(
+        selectedContributionCategory,
+        selectedContributionLanguage
+      )] || null
+    : null;
   const categoryIssues: any[] = selectedCategoryResult?.issues || [];
   const categoryRepositories: any[] = selectedCategoryResult?.repositories || [];
   const categoryRecommendationFailures: any[] = selectedCategoryResult?.failedRepositories || [];
@@ -893,6 +941,7 @@ export default function App() {
     ...[...new Set<string>(activeFeatureIssues.flatMap((issue: any) => issue.languageTags || []))]
       .sort((a, b) => a.localeCompare(b))
   ];
+  const contributionLanguageOptions = getContributionCategoryLanguages(selectedContributionCategory);
 
   const isGithubIssue = [
     'github-import',
@@ -976,6 +1025,9 @@ export default function App() {
     setFeatureSourceMode,
     selectedContributionCategory,
     selectContributionCategory,
+    selectedContributionLanguage,
+    contributionLanguageOptions,
+    selectContributionLanguage,
     categoryIssues,
     categoryRepositories,
     categoryRecommendationFailures,

@@ -1,17 +1,23 @@
-import type { ContributionCategoryId } from "../../shared/contributionCategories";
+import type {
+  ContributionCategoryId,
+  ContributionLanguage
+} from "../../shared/contributionCategories";
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
 type CategoryIssueOptions = {
+  language: ContributionLanguage;
   force?: boolean;
   signal?: AbortSignal;
 };
 
-const cacheKey = (category: ContributionCategoryId) => `oss:category-issues:v2:${category}`;
+const cacheKey = (category: ContributionCategoryId, language: ContributionLanguage) => (
+  `oss:category-issues:v5:${category}:${language}`
+);
 
-const readCache = (category: ContributionCategoryId) => {
+const readCache = (category: ContributionCategoryId, language: ContributionLanguage) => {
   try {
-    const cached = JSON.parse(sessionStorage.getItem(cacheKey(category)) || "null");
+    const cached = JSON.parse(sessionStorage.getItem(cacheKey(category, language)) || "null");
     if (!cached || Date.now() - cached.loadedAtMs > CACHE_TTL_MS) return null;
     return cached;
   } catch {
@@ -19,9 +25,9 @@ const readCache = (category: ContributionCategoryId) => {
   }
 };
 
-const writeCache = (category: ContributionCategoryId, value: any) => {
+const writeCache = (category: ContributionCategoryId, language: ContributionLanguage, value: any) => {
   try {
-    sessionStorage.setItem(cacheKey(category), JSON.stringify(value));
+    sessionStorage.setItem(cacheKey(category, language), JSON.stringify(value));
   } catch {
     // Category recommendations still work when browser storage is unavailable.
   }
@@ -46,14 +52,14 @@ const normalizeResponse = (data: any) => {
 
 export const fetchCategoryIssues = async (
   category: ContributionCategoryId,
-  { force = false, signal }: CategoryIssueOptions = {}
+  { language, force = false, signal }: CategoryIssueOptions
 ) => {
   if (!force) {
-    const cached = readCache(category);
+    const cached = readCache(category, language);
     if (cached) return { ...cached, cached: true };
   }
 
-  const query = new URLSearchParams({ category });
+  const query = new URLSearchParams({ category, language });
   if (force) query.set("refresh", "1");
   const response = await fetch(`/api/category-issues?${query}`, {
     signal,
@@ -63,6 +69,6 @@ export const fetchCategoryIssues = async (
   if (!response.ok) throw new Error(data.error || "카테고리 추천 이슈를 불러오지 못했습니다.");
 
   const payload = normalizeResponse(data);
-  writeCache(category, payload);
+  writeCache(category, language, payload);
   return payload;
 };

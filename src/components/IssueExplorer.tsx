@@ -11,18 +11,21 @@ export const IssueFilters = ({
   onDifficultyChange,
   issueType,
   onIssueTypeChange,
+  showLanguage = true,
   showIssueType = true
 }: any) => (
   <div className="filter-panel p-3 space-y-3">
-    <div className="space-y-2">
-      <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider">언어 필터</span>
-      <LanguageFilterBar
-        selectedLanguage={language}
-        onChange={onLanguageChange}
-        languages={languages}
-      />
-    </div>
-    <div className="soft-divider pt-3 border-t space-y-2">
+    {showLanguage && (
+      <div className="space-y-2">
+        <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider">언어 필터</span>
+        <LanguageFilterBar
+          selectedLanguage={language}
+          onChange={onLanguageChange}
+          languages={languages}
+        />
+      </div>
+    )}
+    <div className={`${showLanguage ? "soft-divider pt-3 border-t " : ""}space-y-2`}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-[10px] font-bold text-[#57606a] uppercase tracking-wider block">난이도</span>
         <span className="text-[10px] text-[#6e7781]">저장소 라벨 우선 · 자동 추정</span>
@@ -139,6 +142,11 @@ export const IssueRecommendationGrid = ({
                 ? `연관 PR ${issue.relatedPullRequestCount}${issue.relatedPullRequestCountTruncated ? "+" : ""}개`
                 : "연관 PR 확인 불가"}
             </span>
+            {issue.claimCommentCount === 0 && !issue.claimCommentReviewTruncated && (
+              <span title="최근 GitHub 이슈 댓글에서 작업을 맡겠다는 의사 표현을 확인한 결과">
+                작업 의사 댓글 없음
+              </span>
+            )}
           </div>
         </div>
 

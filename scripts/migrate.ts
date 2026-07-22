@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { enforceVerifiedPostgresTls } from "../server/postgresUrl.js";
@@ -10,23 +11,30 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL이 설정되지 않았습니다.");
 }
 
-const migrationUrl = new URL("../database/migrations/001_workspace.sql", import.meta.url);
-const migration = await readFile(fileURLToPath(migrationUrl), "utf8");
+const migrationsUrl = new URL("../database/migrations/", import.meta.url);
+const migrationsDirectory = fileURLToPath(migrationsUrl);
 const pool = new Pool({
   connectionString: enforceVerifiedPostgresTls(databaseUrl),
   max: 1
 });
 
-const statements = migration
-  .split(/;\s*(?:\n|$)/)
-  .map(statement => statement.trim())
-  .filter(Boolean);
-
 try {
-  for (const statement of statements) {
-    await pool.query(statement);
+  const migrationFiles = (await readdir(migrationsDirectory))
+    .filter(file => file.endsWith(".sql"))
+    .sort();
+  for (const migrationFile of migrationFiles) {
+    const migrationUrl = new URL(migrationFile, migrationsUrl);
+    const migration = await readFile(fileURLToPath(migrationUrl), "utf8");
+    const statements = migration
+      .split(/;\s*(?:\n|$)/)
+      .map(statement => statement.trim())
+      .filter(Boolean);
+    for (const statement of statements) {
+      await pool.query(statement);
+    }
+    console.log(`Applied ${migrationFile}`);
   }
 } finally {
   await pool.end();
 }
-console.log("Workspace database migration completed.");
+console.log(`Database migrations completed from ${dirname(migrationsDirectory)}.`);

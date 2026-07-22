@@ -3173,6 +3173,10 @@ body {
   font-weight: 800;
 }
 
+.category-repository-card a:hover strong {
+  color: #3f6fd9;
+}
+
 .category-repository-card small {
   margin-top: 3px;
   color: #888888;
@@ -3182,6 +3186,21 @@ body {
 .category-repository-card > .repository-health-status {
   grid-column: 2;
   justify-self: start;
+}
+
+.category-repository-deepwiki {
+  grid-column: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  color: #3f6fd9;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.category-repository-deepwiki:hover {
+  text-decoration: underline;
 }
 
 .category-result-tools {
