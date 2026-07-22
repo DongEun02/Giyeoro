@@ -1,4 +1,5 @@
 const RELATED_PRS_PER_ISSUE = 100;
+const RELATED_PRS_BATCH_SIZE = 10;
 
 const RELATED_PULL_REQUESTS_QUERY = `
   query RelatedPullRequests($ids: [ID!]!) {
@@ -45,10 +46,48 @@ const relatedPullRequestResult = (node: any) => {
   };
 };
 
+const fetchRelatedPullRequestBatch = async (
+  nodeIds: string[],
+  githubToken: any
+): Promise<Array<readonly [string, { count: number; truncated: boolean }]>> => {
+  const response = await fetch("https://api.github.com/graphql", {
+    method: "POST",
+    headers: githubHeaders(githubToken),
+    body: JSON.stringify({
+      query: RELATED_PULL_REQUESTS_QUERY,
+      variables: { ids: nodeIds }
+    }),
+    signal: AbortSignal.timeout(20_000)
+  });
+  if (response.status === 403 || response.status === 429) throw new Error("GITHUB_RATE_LIMIT");
+  if (!response.ok) throw new Error("GITHUB_RELATED_PRS_UNAVAILABLE");
+
+  const payload: any = await response.json();
+  if (payload.errors?.length) {
+    const exceededResourceLimit = payload.errors.some(
+      (error: any) => error?.type === "RESOURCE_LIMITS_EXCEEDED"
+    );
+    if (exceededResourceLimit && nodeIds.length > 1) {
+      const middle = Math.ceil(nodeIds.length / 2);
+      const leftResults = await fetchRelatedPullRequestBatch(nodeIds.slice(0, middle), githubToken);
+      const rightResults = await fetchRelatedPullRequestBatch(nodeIds.slice(middle), githubToken);
+      return [...leftResults, ...rightResults];
+    }
+    throw new Error("GITHUB_RELATED_PRS_UNAVAILABLE");
+  }
+
+  return (payload.data?.nodes || [])
+    .filter((node: any) => node?.id)
+    .map((node: any) => [node.id, relatedPullRequestResult(node)] as const);
+};
+
 export const enrichRelatedPullRequestCounts = async (
   issues: any,
   githubToken: any,
-  { required = false } = {}
+  {
+    required = false,
+    stopAfterUnclaimed = Number.POSITIVE_INFINITY
+  } = {}
 ) => {
   if (issues.length === 0) return issues;
   if (!githubToken) {
@@ -67,27 +106,35 @@ export const enrichRelatedPullRequestCounts = async (
   }
 
   try {
-    const response = await fetch("https://api.github.com/graphql", {
-      method: "POST",
-      headers: githubHeaders(githubToken),
-      body: JSON.stringify({
-        query: RELATED_PULL_REQUESTS_QUERY,
-        variables: { ids: nodeIds }
-      }),
-      signal: AbortSignal.timeout(20_000)
-    });
-    if (response.status === 403 || response.status === 429) throw new Error("GITHUB_RATE_LIMIT");
-    if (!response.ok) throw new Error("GITHUB_RELATED_PRS_UNAVAILABLE");
+    const countsByNodeId = new Map<string, { count: number; truncated: boolean }>();
+    let stoppedEarly = false;
 
-    const payload: any = await response.json();
-    if (payload.errors?.length) throw new Error("GITHUB_RELATED_PRS_UNAVAILABLE");
-    const countsByNodeId = new Map<string, { count: number; truncated: boolean }>(
-      (payload.data?.nodes || [])
-        .filter((node: any) => node?.id)
-        .map((node: any) => [node.id, relatedPullRequestResult(node)] as const)
-    );
+    for (let offset = 0; offset < nodeIds.length; offset += RELATED_PRS_BATCH_SIZE) {
+      const batchNodeIds = nodeIds.slice(offset, offset + RELATED_PRS_BATCH_SIZE);
+      const batchResults = await fetchRelatedPullRequestBatch(batchNodeIds, githubToken);
+      batchResults.forEach(([nodeId, result]) => {
+        countsByNodeId.set(nodeId, result);
+      });
 
-    if (required && nodeIds.some(nodeId => !countsByNodeId.has(nodeId))) {
+      if (required && batchNodeIds.some(nodeId => !countsByNodeId.has(nodeId))) {
+        throw new Error("GITHUB_RELATED_PRS_UNAVAILABLE");
+      }
+
+      const unclaimedCount = issues.filter((issue: any) => {
+        const relatedPullRequests = countsByNodeId.get(issue.githubNodeId);
+        return (
+          (issue.assignees?.length || 0) === 0
+          && relatedPullRequests?.count === 0
+          && !relatedPullRequests.truncated
+        );
+      }).length;
+      if (unclaimedCount >= stopAfterUnclaimed) {
+        stoppedEarly = true;
+        break;
+      }
+    }
+
+    if (required && !stoppedEarly && nodeIds.some(nodeId => !countsByNodeId.has(nodeId))) {
       throw new Error("GITHUB_RELATED_PRS_UNAVAILABLE");
     }
 

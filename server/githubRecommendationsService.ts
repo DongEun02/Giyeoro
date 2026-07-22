@@ -340,7 +340,10 @@ const fetchRepositoryRecommendations = async ({ fullName, githubToken }: any) =>
     }),
     fetchRepositoryContributorFriendliness(repository, githubToken)
   ]);
-  const enrichedIssues = await enrichRelatedPullRequestCounts(issues, githubToken, { required: true });
+  const enrichedIssues = await enrichRelatedPullRequestCounts(issues, githubToken, {
+    required: true,
+    stopAfterUnclaimed: MAX_RECOMMENDATIONS
+  });
   const availableIssues = enrichedIssues
     .filter(isUnclaimedIssue)
     .slice(0, MAX_RECOMMENDATIONS);
@@ -512,7 +515,10 @@ const fetchCategoryRecommendations = async ({
   });
 
   const candidates = interleaveIssueLists(matchedIssueLists, MAX_CATEGORY_CANDIDATES);
-  const enrichedIssues = await enrichRelatedPullRequestCounts(candidates, githubToken, { required: true });
+  const enrichedIssues = await enrichRelatedPullRequestCounts(candidates, githubToken, {
+    required: true,
+    stopAfterUnclaimed: MAX_CATEGORY_RECOMMENDATIONS
+  });
   const availableIssues = enrichedIssues
     .filter(isUnclaimedIssue)
     .slice(0, MAX_CATEGORY_RECOMMENDATIONS);
