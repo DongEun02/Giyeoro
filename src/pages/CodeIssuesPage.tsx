@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useOssApp } from "../app/OssAppContext";
 import { Icons } from "../components/Icons";
@@ -8,6 +8,16 @@ import { PersonalizedRepositoryRecommendations } from "../components/Personalize
 import { formatGithubDate } from "../data/content";
 import { CONTRIBUTION_CATEGORIES } from "../../shared/contributionCategories";
 import { TranslationPage } from "./TranslationPage";
+
+const CONTRIBUTION_EXPECTATIONS_KEY = "oss:contribution-expectations:v1";
+
+const hasHiddenContributionExpectations = () => {
+  try {
+    return localStorage.getItem(CONTRIBUTION_EXPECTATIONS_KEY) === "hidden";
+  } catch {
+    return false;
+  }
+};
 
 const formatResponseDuration = (hours: any) => {
   if (!Number.isFinite(hours)) return "확인 불가";
@@ -41,6 +51,9 @@ export function CodeIssuesPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { owner, repository, issueNumber } = useParams();
+  const expectationsDialogRef = useRef<HTMLDialogElement>(null);
+  const [showContributionExpectations, setShowContributionExpectations] = useState(false);
+  const [hideContributionExpectations, setHideContributionExpectations] = useState(false);
   const {
     authUser,
     authLoading,
@@ -121,6 +134,44 @@ export function CodeIssuesPage() {
   const activeContributionCategory = CONTRIBUTION_CATEGORIES.find(
     category => category.id === selectedContributionCategory
   ) || CONTRIBUTION_CATEGORIES[0];
+
+  const openContributionExpectations = () => {
+    setHideContributionExpectations(hasHiddenContributionExpectations());
+    setShowContributionExpectations(true);
+  };
+
+  const closeContributionExpectations = () => {
+    try {
+      if (hideContributionExpectations) {
+        localStorage.setItem(CONTRIBUTION_EXPECTATIONS_KEY, "hidden");
+      } else {
+        localStorage.removeItem(CONTRIBUTION_EXPECTATIONS_KEY);
+      }
+    } catch {
+      // The information dialog still works when browser storage is unavailable.
+    }
+    setShowContributionExpectations(false);
+  };
+
+  useEffect(() => {
+    if (isDetailRoute) return;
+    try {
+      if (hasHiddenContributionExpectations()) return;
+    } catch {
+      // Show the dialog when browser storage is unavailable.
+    }
+    setHideContributionExpectations(false);
+    setShowContributionExpectations(true);
+  }, [isDetailRoute]);
+
+  useEffect(() => {
+    if (!showContributionExpectations) return undefined;
+    const dialog = expectationsDialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => {
+      if (dialog?.open) dialog.close();
+    };
+  }, [showContributionExpectations]);
 
   useEffect(() => {
     if (isDetailRoute) return;
@@ -391,12 +442,76 @@ export function CodeIssuesPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="space-y-6">
-        <div className="page-heading pb-2">
-          <h2 className="text-xl font-bold text-[#1f2933]">첫 기여 찾기</h2>
-          <p className="text-xs text-[#57606a]">
-            처음이라면 STEP 1부터 시작하고, 익숙해지면 다음 단계의 기여로 넘어가 보세요.
+      {showContributionExpectations && (
+        <dialog
+          ref={expectationsDialogRef}
+          className="contribution-expectations-dialog"
+          aria-labelledby="contribution-expectations-heading"
+          aria-describedby="contribution-expectations-description"
+          onCancel={event => {
+            event.preventDefault();
+            closeContributionExpectations();
+          }}
+        >
+          <header className="contribution-expectations-header">
+            <div>
+              <span>첫 기여 안내</span>
+              <h2 id="contribution-expectations-heading">기여 전, 이것만은 알고 시작해요</h2>
+            </div>
+            <button type="button" onClick={closeContributionExpectations} aria-label="협업 안내 닫기">×</button>
+          </header>
+
+          <p id="contribution-expectations-description" className="contribution-expectations-intro">
+            오픈소스는 회사 업무와 다른 속도로 움직입니다. 현실적인 기대를 갖고 시작하면 기다리는 과정도 훨씬 편해져요.
           </p>
+
+          <ol className="contribution-expectations-list">
+            <li>
+              <strong>대부분 비동기로 협업해요</strong>
+              <span>메인테이너와 기여자는 각자의 일정과 시간대에 맞춰 참여합니다.</span>
+            </li>
+            <li>
+              <strong>리뷰에는 정해진 기한이 없어요</strong>
+              <span>답변은 몇 주에서 수개월, 경우에 따라 1년 이상 걸리거나 오지 않을 수도 있습니다.</span>
+            </li>
+            <li>
+              <strong>느린 답변이 거절을 의미하진 않아요</strong>
+              <span>프로젝트의 인력과 우선순위 때문인 경우가 많으니 기여의 가치와 연결 짓지 않아도 됩니다.</span>
+            </li>
+          </ol>
+
+          <div className="contribution-expectations-tip">
+            <Icons.Check className="w-4 h-4 shrink-0" />
+            <span><strong>답변을 기다릴 때</strong> 기여 규칙을 먼저 확인하고, 충분한 시간이 지난 뒤 정중하게 한 번만 후속 댓글을 남겨보세요.</span>
+          </div>
+
+          <footer className="contribution-expectations-footer">
+            <label>
+              <input
+                type="checkbox"
+                checked={hideContributionExpectations}
+                onChange={event => setHideContributionExpectations(event.target.checked)}
+              />
+              다음부터 이 안내 보지 않기
+            </label>
+            <button type="button" onClick={closeContributionExpectations} autoFocus>
+              확인했어요, 이슈 둘러보기
+            </button>
+          </footer>
+        </dialog>
+      )}
+
+      <div className="space-y-6">
+        <div className="page-heading page-heading-with-action pb-2">
+          <div>
+            <h2 className="text-xl font-bold text-[#1f2933]">첫 기여 찾기</h2>
+            <p className="text-xs text-[#57606a]">
+              처음이라면 STEP 1부터 시작하고, 익숙해지면 다음 단계의 기여로 넘어가 보세요.
+            </p>
+          </div>
+          <button type="button" className="contribution-expectations-open" onClick={openContributionExpectations}>
+            <Icons.BookOpen className="w-4 h-4" /> 오픈소스 협업 안내
+          </button>
         </div>
 
         <div className="feature-source-tabs" role="tablist" aria-label="첫 기여 찾기 방식">
