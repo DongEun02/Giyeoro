@@ -112,9 +112,9 @@
 .landing-home-minimal .landing-intro-content {
   z-index: 3;
   order: 1;
-  width: 100%;
-  max-width: 900px;
-  text-align: center;
+  width: fit-content;
+  max-width: min(900px, 100%);
+  text-align: left;
   transform: translateY(-7vh);
 }
 
@@ -130,7 +130,7 @@
 
 .landing-home-minimal .landing-intro h1 {
   max-width: none;
-  margin-inline: auto;
+  margin-inline: 0;
   color: #171717;
   font-size: clamp(42px, 4.2vw, 60px);
   font-weight: 760;
@@ -177,14 +177,14 @@
 
 .landing-home-minimal .landing-intro-copy {
   max-width: 570px;
-  margin: 22px auto 0;
+  margin: 22px 0 0;
   color: #686864;
   font-size: clamp(13px, 1.15vw, 16px);
   line-height: 1.8;
 }
 
 .landing-home-minimal .landing-intro-actions {
-  justify-content: center;
+  justify-content: flex-start;
   margin-top: 32px;
 }
 
@@ -411,7 +411,7 @@
   }
 
   .landing-home-minimal .landing-intro-content {
-    max-width: 720px;
+    max-width: min(720px, 100%);
     transform: translateY(-6vh);
   }
 
@@ -452,6 +452,7 @@
   }
 
   .landing-home-minimal .landing-intro-content {
+    width: 100%;
     max-width: none;
     transform: translateY(-7vh);
   }
