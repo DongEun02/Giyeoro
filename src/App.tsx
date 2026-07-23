@@ -2,6 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { OssAppProvider } from "./app/OssAppContext";
 import { BrandMark, SITE_ICON_DATA_URL } from "./components/BrandMark";
+import {
+  alignAnalysisDifficulty,
+  hasRecommendationDifficulty
+} from "./services/issueDifficulty";
 import { GitHubAuthControl } from "./components/GitHubAuthControl";
 import { Icons } from "./components/Icons";
 import { usePersistentState } from "./hooks/usePersistentState";
@@ -686,7 +690,7 @@ export default function App() {
     setCategoryRefreshVersion(version => version + 1);
   };
 
-  const analyzeIssueWithCodex = async (targetUrl: any) => {
+  const analyzeIssueWithCodex = async (targetUrl: any, sourceIssue: any = issueData) => {
     setCodexAnalysis(null);
     setCodexAnalysisError("");
     setCodexAnalysisLoading(true);
@@ -702,9 +706,11 @@ export default function App() {
 
       const nextAnalysis = {
         ...data.analysis,
+        difficulty: alignAnalysisDifficulty(sourceIssue, data.analysis.difficulty),
         cached: !!data.cached,
         generatedAt: data.generatedAt
       };
+      const preservesRecommendationDifficulty = hasRecommendationDifficulty(sourceIssue);
       const translatedIssueFields = {
         titleKo: nextAnalysis.translatedTitleKo,
         summaryKo: nextAnalysis.summaryKo,
@@ -716,7 +722,9 @@ export default function App() {
           "중간": "medium",
           "도전": "challenging"
         } as Record<string, string>)[nextAnalysis.difficulty.level] || "unlabeled",
-        difficultySource: "ai-analysis",
+        difficultySource: preservesRecommendationDifficulty
+          ? sourceIssue.difficultySource
+          : "ai-analysis",
         difficultyConfidence: nextAnalysis.difficulty.confidence,
         difficultyReason: nextAnalysis.difficulty.rationale,
         workType: nextAnalysis.workType === "기타" ? "유형 미분류" : nextAnalysis.workType,
@@ -789,7 +797,7 @@ export default function App() {
       ? 'issue-url'
       : savedIssue.source === 'github-category' ? 'category' : 'repository');
     navigate(`/issues/${savedIssue.repo}/${savedIssue.number}`);
-    if (!savedIssue.codexAnalysis) void analyzeIssueWithCodex(savedIssue.url);
+    if (!savedIssue.codexAnalysis) void analyzeIssueWithCodex(savedIssue.url, savedIssue);
   };
 
   const requestRepositoryRecommendations = async (query: string) => {
@@ -844,7 +852,7 @@ export default function App() {
     setIssueData(issue);
     setCodexAnalysis(issue.codexAnalysis || null);
     setCodexAnalysisError("");
-    if (!issue.codexAnalysis) void analyzeIssueWithCodex(issue.url);
+    if (!issue.codexAnalysis) void analyzeIssueWithCodex(issue.url, issue);
   };
 
   const loadIssueByUrl = async (event: any) => {

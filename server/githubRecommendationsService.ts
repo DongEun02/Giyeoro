@@ -62,7 +62,7 @@ const ESTIMATED_DIFFICULTY_LABELS = {
 
 const STARTER_SCOPE_PATTERN = /\b(typo|spelling|wording|readme|documentation|docs?|comment|copy|example|sample|tutorial|localization|translation)\b/i;
 const NARROW_CHANGE_PATTERN = /\b(add|adjust|change|fix|remove|rename|update)\b.{0,50}\b(label|message|text|test|docs?|readme|example|comment|warning)\b/i;
-const COMPLEX_SCOPE_PATTERN = /\b(architecture|compiler|parser|seriali[sz]ation|deseriali[sz]ation|concurrency|parallel|simd|bytecode|codegen|reflection|classloader|abi|ffi|unsafe|no[-_ ]std|embedded[-_ ]io|race condition|deadlock|memory leak|security|authentication|authorization|migration|protocol|distributed|infrastructure|rendering engine|database|cross[- ]platform|breaking change)\b/i;
+const COMPLEX_SCOPE_PATTERN = /\b(architecture|compiler|parser|seriali[sz]ation|deseriali[sz]ation|concurrency|parallel|simd|bytecode|codegen|reflection|classloader|abi|ffi|unsafe|no[-_ ]std|embedded[-_ ]io|race condition|deadlock|memory leak|security|authentication|authorization|migration|protocol|distributed|infrastructure|rendering engine|database|cross[- ]platform|breaking change|symbolic links?|symlinks?|installers?|installation|packaging|distribution)\b/i;
 const INVESTIGATION_PATTERN = /\b(root cause|investigat(e|ion)|unknown|intermittent|flaky|cannot reproduce|can't reproduce|rfc|proposal|prototype|design discussion)\b/i;
 const SMALL_SCOPE_LABEL_PATTERN = /\b(size[:/ -]?(xs|small)|small scope|low risk|easy fix)\b/i;
 const LARGE_SCOPE_LABEL_PATTERN = /\b(size[:/ -]?(large|xl)|complex|epic|needs investigation|high risk)\b/i;
@@ -121,7 +121,7 @@ const normalizeLabels = (labels: any) => (labels || []).map((label: any) => {
   };
 }).filter((label: any) => label.name);
 
-const inferDifficulty = ({ labels, title, body, workType, comments }: any) => {
+export const inferDifficulty = ({ labels, title, body, workType, comments }: any) => {
   for (const { level, pattern } of DIFFICULTY_PATTERNS) {
     const matchedLabel = labels.find((label: any) => pattern.test(label.name));
     if (matchedLabel) {

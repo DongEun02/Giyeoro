@@ -12,7 +12,7 @@ type CategoryIssueOptions = {
 };
 
 const cacheKey = (category: ContributionCategoryId, language: ContributionLanguage) => (
-  `oss:category-issues:v6:${category}:${language}`
+  `oss:category-issues:v7:${category}:${language}`
 );
 
 const readCache = (category: ContributionCategoryId, language: ContributionLanguage) => {

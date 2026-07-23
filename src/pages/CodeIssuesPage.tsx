@@ -390,7 +390,7 @@ export function CodeIssuesPage() {
             <div className="codex-analysis-error" role="alert">
               <Icons.Alert className="w-4 h-4 shrink-0" />
               <span>{codexAnalysisError}</span>
-              <button type="button" onClick={() => analyzeIssueWithCodex(issueData.url)}>다시 분석</button>
+              <button type="button" onClick={() => analyzeIssueWithCodex(issueData.url, issueData)}>다시 분석</button>
             </div>
           )}
 
