@@ -37,7 +37,8 @@ const BASIC_FEATURES = [
 const GITHUB_FEATURES = [
   "공개 저장소의 언어·의존성·최근 활동 기반 맞춤 추천",
   "관심 있는 이슈와 번역 작업 저장",
-  "관심·작업 중·리뷰 중·완료 상태 관리",
+  "내가 작성한 공개 오픈소스 PR 링크 저장",
+  "관심·진행 중·기여 완료 상태 관리",
   "다른 기기에서도 이어지는 마이페이지 동기화"
 ];
 
@@ -45,7 +46,11 @@ const CONTRIBUTION_STEPS = [
   { number: "01", title: "나에게 맞는 작업 찾기", description: "언어와 작업 유형을 고르거나 GitHub 경험을 바탕으로 프로젝트를 추천받습니다." },
   { number: "02", title: "지금 참여해도 되는지 확인", description: "담당자, 연결된 PR, 선점 의사가 담긴 댓글을 확인해 작업 중복 가능성을 줄입니다." },
   { number: "03", title: "이슈와 규칙 이해하기", description: "이슈 요약과 예상 작업을 읽고 프로젝트의 기여 규칙과 제출 체크리스트를 준비합니다." },
-  { number: "04", title: "기여 과정 이어가기", description: "로그인했다면 관심 작업을 저장하고 진행 상태를 마이페이지에서 관리합니다." }
+  {
+    number: "04",
+    title: "기여 과정 이어가기",
+    description: "로그인했다면 관심 작업과 내가 작성한 PR을 저장하고 진행 상태를 마이페이지에서 관리합니다."
+  }
 ];
 
 export function AboutPage() {
