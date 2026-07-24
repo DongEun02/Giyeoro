@@ -40,7 +40,7 @@ export const fetchGithubPullRequestByUrl = async (
   { signal }: { signal?: AbortSignal } = {}
 ): Promise<GithubPullRequestResult> => {
   const response = await fetch(
-    `/api/github-pull-request?url=${encodeURIComponent(pullRequestUrl)}`,
+    `/api/workspace?operation=pull-request&url=${encodeURIComponent(pullRequestUrl)}`,
     {
       signal,
       headers: { Accept: "application/json" }
