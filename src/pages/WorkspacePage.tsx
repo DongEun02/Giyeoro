@@ -1,10 +1,16 @@
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { MyPage } from "../components/MyPage";
 import { MyPageLoginGate } from "../components/MyPageLoginGate";
 import { useOssApp } from "../app/OssAppContext";
+import { fetchGithubPullRequestByUrl } from "../services/githubPullRequest";
 
 export function WorkspacePage() {
   const navigate = useNavigate();
+  const [pullRequestUrl, setPullRequestUrl] = useState("");
+  const [pullRequestLoading, setPullRequestLoading] = useState(false);
+  const [pullRequestError, setPullRequestError] = useState("");
   const {
     authUser,
     authLoading,
@@ -15,8 +21,30 @@ export function WorkspacePage() {
     setMyPageStatus,
     updateWorkspaceStatus,
     removeWorkspaceItem,
+    savePullRequest,
     openWorkspaceItem
   } = useOssApp();
+
+  const handlePullRequestSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const url = pullRequestUrl.trim();
+    if (!url || pullRequestLoading) return;
+
+    setPullRequestLoading(true);
+    setPullRequestError("");
+
+    try {
+      const result = await fetchGithubPullRequestByUrl(url);
+      await savePullRequest(result);
+      setPullRequestUrl("");
+    } catch (error) {
+      setPullRequestError(
+        error instanceof Error ? error.message : "Pull Request를 저장하지 못했습니다."
+      );
+    } finally {
+      setPullRequestLoading(false);
+    }
+  };
 
   if (authLoading || !authUser) {
     return <MyPageLoginGate loading={authLoading} />;
@@ -53,6 +81,14 @@ export function WorkspacePage() {
         onRemove={removeWorkspaceItem}
         onOpen={openWorkspaceItem}
         onBrowse={() => navigate("/issues")}
+        pullRequestUrl={pullRequestUrl}
+        pullRequestLoading={pullRequestLoading}
+        pullRequestError={pullRequestError}
+        onPullRequestUrlChange={value => {
+          setPullRequestUrl(value);
+          if (pullRequestError) setPullRequestError("");
+        }}
+        onPullRequestSubmit={handlePullRequestSubmit}
       />
     </>
   );

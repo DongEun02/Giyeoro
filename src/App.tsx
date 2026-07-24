@@ -34,6 +34,7 @@ import {
 } from "./services/translationStatus";
 import {
   clearLegacyWorkspaceItems,
+  createPullRequestWorkspaceItem,
   createWorkspaceItem,
   indexWorkspaceItems,
   readLegacyWorkspaceItems,
@@ -586,6 +587,43 @@ export default function App() {
     });
   };
 
+  const savePullRequest = async (result: any) => {
+    if (!authUser) throw new Error("GitHub 로그인이 필요합니다.");
+    if (workspaceLoading) throw new Error("작업 목록을 불러온 뒤 다시 시도해 주세요.");
+
+    const importedItem = createPullRequestWorkspaceItem(result);
+    const existingItem = trackedTasks[importedItem.id];
+    const workspaceItem = existingItem
+      ? {
+          ...importedItem,
+          status: existingItem.status,
+          savedAt: existingItem.savedAt
+        }
+      : importedItem;
+    const previousItems = trackedTasks;
+
+    setTrackedTasks({ ...trackedTasks, [workspaceItem.id]: workspaceItem });
+
+    try {
+      await upsertWorkspaceItem(workspaceItem);
+      setMyPageStatus(workspaceItem.status);
+      triggerToast(
+        existingItem
+          ? `'${workspaceItem.title}' PR 정보를 업데이트했습니다.`
+          : `'${workspaceItem.title}' PR을 내 작업실에 저장했습니다.`
+      );
+      trackAnalyticsEvent("pull_request_save", {
+        repository: workspaceItem.repo,
+        pull_request_number: result.pullRequest.number,
+        action: existingItem ? "update" : "add"
+      });
+      return workspaceItem;
+    } catch (error) {
+      setTrackedTasks(previousItems);
+      throw error;
+    }
+  };
+
   const handleCopyToClipboard = (text: any, type: any) => {
     const textArea = document.createElement("textarea");
     textArea.value = text;
@@ -776,6 +814,11 @@ export default function App() {
   };
 
   const openWorkspaceItem = (item: any) => {
+    if (item.kind === "pull_request") {
+      if (item.url) window.open(item.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
     if (item.kind === "translation") {
       const language = item.languageTags?.[0] || "All";
       setTranslationLanguage(language);
@@ -997,6 +1040,7 @@ export default function App() {
     setMyPageStatus,
     updateWorkspaceStatus,
     removeWorkspaceItem,
+    savePullRequest,
     openWorkspaceItem,
     selectedRepo,
     setSelectedRepo,

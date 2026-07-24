@@ -9,7 +9,7 @@ type WorkspaceServiceOptions = GithubAuthOptions & {
 };
 
 type WorkspaceStatus = "interested" | "in_progress" | "completed";
-type WorkspaceKind = "issue" | "translation";
+type WorkspaceKind = "issue" | "translation" | "pull_request";
 
 type WorkspaceItem = {
   id: string;
@@ -44,7 +44,7 @@ type WorkspaceRow = {
 };
 
 const WORKSPACE_STATUSES = new Set<WorkspaceStatus>(["interested", "in_progress", "completed"]);
-const WORKSPACE_KINDS = new Set<WorkspaceKind>(["issue", "translation"]);
+const WORKSPACE_KINDS = new Set<WorkspaceKind>(["issue", "translation", "pull_request"]);
 const MAX_ITEMS_PER_SYNC = 100;
 const MAX_REQUEST_BYTES = 512 * 1024;
 

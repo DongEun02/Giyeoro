@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "test": "node --import tsx --test server/githubIssueAvailabilityService.test.ts server/githubRecommendationsService.test.ts shared/contributionCategories.test.ts src/services/issueDifficulty.test.ts",
+    "test": "node --import tsx --test server/githubIssueAvailabilityService.test.ts server/githubPullRequestService.test.ts server/githubRecommendationsService.test.ts shared/contributionCategories.test.ts src/services/issueDifficulty.test.ts src/services/userWorkspace.test.ts",
     "db:migrate": "dotenv -e .env.local -e .env.development.local -- tsx scripts/migrate.ts",
     "db:sync-catalog": "dotenv -e .env.local -e .env.development.local -- tsx scripts/syncDeepWikiCatalog.ts",
     "preview": "vite preview --host 127.0.0.1",

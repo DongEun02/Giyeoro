@@ -5501,6 +5501,124 @@ body {
   background: #f6f8ff;
 }
 
+.mypage-pr-import {
+  display: grid;
+  grid-template-columns: minmax(230px, .8fr) minmax(420px, 1.4fr);
+  align-items: center;
+  gap: 40px;
+  padding: 26px 28px;
+  border: 1px solid #e4e4e4;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 8% 20%, rgba(255, 111, 92, .08), transparent 34%),
+    #fafafa;
+}
+
+.mypage-pr-import-copy > span {
+  color: var(--accent-warm);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.mypage-pr-import-copy h2 {
+  margin: 7px 0 0;
+  color: #171717;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.mypage-pr-import-copy p {
+  margin: 7px 0 0;
+  color: #747474;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.mypage-pr-import-form {
+  min-width: 0;
+}
+
+.mypage-pr-import-form > label {
+  display: block;
+  margin-bottom: 7px;
+  color: #555555;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.mypage-pr-import-form > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.mypage-pr-import-form input {
+  min-width: 0;
+  height: 42px;
+  padding: 0 13px;
+  border: 1px solid #d5d5d5;
+  border-radius: 8px;
+  outline: none;
+  background: #ffffff;
+  color: #222222;
+  font-size: 10px;
+}
+
+.mypage-pr-import-form input::placeholder {
+  color: #aaaaaa;
+}
+
+.mypage-pr-import-form input:focus {
+  border-color: #777777;
+  box-shadow: 0 0 0 3px rgba(23, 23, 23, .07);
+}
+
+.mypage-pr-import-form input[aria-invalid="true"] {
+  border-color: #c94a3a;
+}
+
+.mypage-pr-import-form button {
+  min-width: 88px;
+  height: 42px;
+  padding: 0 15px;
+  border: 1px solid #171717;
+  border-radius: 8px;
+  background: #171717;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mypage-pr-import-form button:hover:not(:disabled) {
+  background: #333333;
+}
+
+.mypage-pr-import-form button:disabled,
+.mypage-pr-import-form input:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.mypage-pr-import-note,
+.mypage-pr-import-error {
+  margin: 7px 0 0;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.mypage-pr-import-note {
+  color: #888888;
+}
+
+.mypage-pr-import-error {
+  color: #b83c2e;
+  font-weight: 650;
+}
+
 .mypage-status-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5657,6 +5775,11 @@ body {
 
 .mypage-item-meta .mypage-assigned {
   color: #80591c;
+  font-weight: 750;
+}
+
+.mypage-item-meta .mypage-pr-diff {
+  color: #267044;
   font-weight: 750;
 }
 
@@ -7065,6 +7188,11 @@ body {
     gap: 22px;
   }
 
+  .mypage-pr-import {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
   .mypage-stats {
     width: 100%;
   }
@@ -7302,6 +7430,18 @@ body {
 
   .mypage-overview {
     padding: 22px 0;
+  }
+
+  .mypage-pr-import {
+    padding: 22px 18px;
+  }
+
+  .mypage-pr-import-form > div {
+    grid-template-columns: 1fr;
+  }
+
+  .mypage-pr-import-form button {
+    width: 100%;
   }
 
   .mypage-stats > div {
