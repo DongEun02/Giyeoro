@@ -45,6 +45,14 @@ function getSeoConfig(pathname: string): SeoConfig {
     };
   }
 
+  if (pathname.startsWith("/portfolio")) {
+    return {
+      title: "오픈소스 기여 포트폴리오 | 기여로",
+      description: "기여로에서 완료한 오픈소스 이슈와 GitHub에 병합된 Pull Request를 확인하세요.",
+      canonicalPath: pathname
+    };
+  }
+
   return DEFAULT_SEO;
 }
 

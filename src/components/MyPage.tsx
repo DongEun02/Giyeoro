@@ -16,6 +16,9 @@ type MyPageProps = {
   onRemove: (item: WorkspaceItem) => void;
   onOpen: (item: WorkspaceItem) => void;
   onBrowse: () => void;
+  onOpenPortfolio: () => void;
+  onSharePortfolio: () => void;
+  portfolioCopied: boolean;
   pullRequestUrl: string;
   pullRequestLoading: boolean;
   pullRequestError: string;
@@ -32,6 +35,9 @@ export const MyPage = ({
   onRemove,
   onOpen,
   onBrowse,
+  onOpenPortfolio,
+  onSharePortfolio,
+  portfolioCopied,
   pullRequestUrl,
   pullRequestLoading,
   pullRequestError,
@@ -46,6 +52,10 @@ export const MyPage = ({
     [status.value]: allItems.filter(item => item.status === status.value).length
   }), {} as Record<string, number>);
   const visibleItems = allItems.filter(item => item.status === activeStatus);
+  const publicItemCount = allItems.filter(item => (
+    item.status === "completed"
+    && (item.kind === "issue" || (item.kind === "pull_request" && item.data?.merged === true))
+  )).length;
   const activeLabel = WORKSPACE_STATUSES.find(status => status.value === activeStatus)?.label || "저장한 작업";
 
   return (
@@ -88,6 +98,32 @@ export const MyPage = ({
           새 이슈 찾기
           <Icons.ArrowRight className="w-3.5 h-3.5" />
         </button>
+      </section>
+
+      <section className="mypage-portfolio-share" aria-labelledby="mypage-portfolio-title">
+        <div className="mypage-portfolio-copy">
+          <span>Public Portfolio</span>
+          <h2 id="mypage-portfolio-title">완료한 기여를 링크로 공유하세요</h2>
+          <p>
+            공개 페이지에는 완료 처리한 이슈와 GitHub에서 병합된 PR만 표시됩니다.
+            방문자는 내용을 볼 수만 있고 추가·삭제·상태 변경은 할 수 없어요.
+          </p>
+        </div>
+        <div className="mypage-portfolio-actions">
+          <span>현재 공개되는 기여 <strong>{publicItemCount}개</strong></span>
+          <div>
+            <button type="button" className="mypage-portfolio-preview" onClick={onOpenPortfolio}>
+              공개 페이지 보기
+              <Icons.ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" className="mypage-portfolio-share-button" onClick={onSharePortfolio}>
+              {portfolioCopied
+                ? <Icons.Check className="w-3.5 h-3.5" />
+                : <Icons.Clipboard className="w-3.5 h-3.5" />}
+              {portfolioCopied ? "링크 복사됨" : "공유 링크 복사"}
+            </button>
+          </div>
+        </div>
       </section>
 
       <section className="mypage-pr-import" aria-labelledby="mypage-pr-import-title">

@@ -16,6 +16,7 @@ import { AboutPage } from "./pages/AboutPage";
 import { CodeIssuesPage } from "./pages/CodeIssuesPage";
 import { ContributionGuidePage } from "./pages/ContributionGuidePage";
 import { LandingPage } from "./pages/LandingPage";
+import { PortfolioPage } from "./pages/PortfolioPage";
 import { TranslationPage } from "./pages/TranslationPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { fetchContributionGuide } from "./services/contributionGuide";
@@ -72,7 +73,9 @@ export default function App() {
         ? "guide"
         : location.pathname.startsWith("/mypage")
           ? "mypage"
-          : location.pathname.startsWith("/about") ? "about" : "landing";
+          : location.pathname.startsWith("/portfolio")
+            ? "portfolio"
+            : location.pathname.startsWith("/about") ? "about" : "landing";
   const routeForView: Record<string, string> = {
     landing: "/",
     about: "/about",
@@ -1196,6 +1199,7 @@ export default function App() {
             <Route path="/guides" element={<ContributionGuidePage />} />
             <Route path="/guides/:owner/:repository" element={<ContributionGuidePage />} />
             <Route path="/mypage" element={<WorkspacePage />} />
+            <Route path="/portfolio/:login" element={<PortfolioPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

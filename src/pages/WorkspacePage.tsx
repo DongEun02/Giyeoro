@@ -11,6 +11,7 @@ export function WorkspacePage() {
   const [pullRequestUrl, setPullRequestUrl] = useState("");
   const [pullRequestLoading, setPullRequestLoading] = useState(false);
   const [pullRequestError, setPullRequestError] = useState("");
+  const [portfolioCopied, setPortfolioCopied] = useState(false);
   const {
     authUser,
     authLoading,
@@ -22,8 +23,24 @@ export function WorkspacePage() {
     updateWorkspaceStatus,
     removeWorkspaceItem,
     savePullRequest,
-    openWorkspaceItem
+    openWorkspaceItem,
+    triggerToast
   } = useOssApp();
+
+  const portfolioPath = authUser
+    ? `/portfolio/${encodeURIComponent(authUser.login)}`
+    : "/mypage";
+
+  const handlePortfolioShare = async () => {
+    try {
+      const shareUrl = new URL(portfolioPath, window.location.origin).toString();
+      await navigator.clipboard.writeText(shareUrl);
+      setPortfolioCopied(true);
+      triggerToast("공개 포트폴리오 링크를 복사했습니다.");
+    } catch {
+      triggerToast("링크를 복사하지 못했습니다. 브라우저 권한을 확인해 주세요.");
+    }
+  };
 
   const handlePullRequestSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -81,6 +98,9 @@ export function WorkspacePage() {
         onRemove={removeWorkspaceItem}
         onOpen={openWorkspaceItem}
         onBrowse={() => navigate("/issues")}
+        onOpenPortfolio={() => navigate(portfolioPath)}
+        onSharePortfolio={handlePortfolioShare}
+        portfolioCopied={portfolioCopied}
         pullRequestUrl={pullRequestUrl}
         pullRequestLoading={pullRequestLoading}
         pullRequestError={pullRequestError}
