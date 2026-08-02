@@ -6708,13 +6708,13 @@ body {
 
 .about-feature-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin-top: 32px;
 }
 
 .about-feature-card {
-  min-height: 385px;
+  min-height: 330px;
   display: flex;
   flex-direction: column;
   padding: 28px;
@@ -7892,6 +7892,11 @@ body {
 .about-feature-card:nth-child(3) .about-feature-card-top > span {
   background: #f1eef9;
   color: #725da7;
+}
+
+.about-feature-card:nth-child(4) .about-feature-card-top > span {
+  background: #eef2f6;
+  color: #4a5a6a;
 }
 
 .about-access-card-github {

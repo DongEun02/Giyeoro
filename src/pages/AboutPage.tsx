@@ -24,6 +24,13 @@ const SERVICE_FEATURES = [
     title: "프로젝트 규칙 확인하고 준비하기",
     description: "저장소의 CONTRIBUTING.md를 찾아 번역하고 브랜치, 커밋, 테스트, PR 규칙을 제출 전 체크리스트로 정리합니다.",
     points: ["기여 가이드 한국어 번역", "원문과 함께 비교", "제출 전 체크리스트"]
+  },
+  {
+    icon: Icons.GitPullRequest,
+    eyebrow: "RECORD",
+    title: "완료한 기여를 기록하고 공유하기",
+    description: "관심 이슈와 직접 작성한 PR을 마이페이지에 모아 관리하고, 완료한 기여는 읽기 전용 포트폴리오로 공유합니다.",
+    points: ["이슈·PR 통합 관리", "완료 이슈·병합 PR만 공개", "편집이 막힌 공유 링크"]
   }
 ];
 
@@ -39,7 +46,8 @@ const GITHUB_FEATURES = [
   "관심 있는 이슈와 번역 작업 저장",
   "내가 작성한 공개 오픈소스 PR 링크 저장",
   "관심·진행 중·기여 완료 상태 관리",
-  "다른 기기에서도 이어지는 마이페이지 동기화"
+  "다른 기기에서도 이어지는 마이페이지 동기화",
+  "완료 이슈와 병합된 PR을 읽기 전용 포트폴리오로 공유"
 ];
 
 const CONTRIBUTION_STEPS = [
@@ -48,8 +56,8 @@ const CONTRIBUTION_STEPS = [
   { number: "03", title: "이슈와 규칙 이해하기", description: "이슈 요약과 예상 작업을 읽고 프로젝트의 기여 규칙과 제출 체크리스트를 준비합니다." },
   {
     number: "04",
-    title: "기여 과정 이어가기",
-    description: "로그인했다면 관심 작업과 내가 작성한 PR을 저장하고 진행 상태를 마이페이지에서 관리합니다."
+    title: "기여를 기록하고 공유하기",
+    description: "관심 작업과 내가 작성한 PR을 마이페이지에서 관리하고, 완료 이슈와 병합된 PR은 읽기 전용 링크로 공유합니다."
   }
 ];
 
@@ -74,8 +82,8 @@ export function AboutPage() {
         <header className="about-section-heading">
           <span className="about-section-number">02</span>
           <div>
-            <h2 id="about-feature-heading">첫 기여에 필요한 세 가지 도움</h2>
-            <p>찾고, 이해하고, 준비하는 흐름을 한곳에 연결했습니다.</p>
+            <h2 id="about-feature-heading">첫 기여를 시작하고 남기는 네 가지 도움</h2>
+            <p>찾고, 이해하고, 준비한 뒤 기록과 공유까지 한곳에 연결했습니다.</p>
           </div>
         </header>
 
@@ -102,7 +110,7 @@ export function AboutPage() {
           <span className="about-section-number">03</span>
           <div>
             <h2 id="about-login-heading">GitHub 로그인 전에도, 로그인 후에는 더 개인적으로</h2>
-            <p>핵심 탐색 기능은 누구나 사용할 수 있고, 로그인하면 내 경험과 기여 기록이 연결됩니다.</p>
+            <p>핵심 탐색 기능은 누구나 사용할 수 있고, 로그인하면 내 경험과 기여 기록, 공개 포트폴리오가 연결됩니다.</p>
           </div>
         </header>
 
@@ -136,8 +144,8 @@ export function AboutPage() {
         <div className="about-privacy-note">
           <Icons.Check className="w-5 h-5" />
           <div>
-            <strong>공개된 GitHub 정보만 사용합니다.</strong>
-            <span>공개 저장소, 사용 언어, 최근 공개 활동과 공개된 의존성 파일만 분석하며 비공개 저장소 권한은 요청하지 않습니다.</span>
+            <strong>공개된 GitHub 정보만 사용하고, 편집 권한은 공유하지 않습니다.</strong>
+            <span>비공개 저장소 권한은 요청하지 않습니다. 포트폴리오에는 완료 처리한 이슈와 GitHub에서 병합이 확인된 PR만 표시되며, 방문자는 내용을 편집할 수 없습니다.</span>
           </div>
         </div>
       </section>
