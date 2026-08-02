@@ -68,14 +68,16 @@ export function AboutPage() {
   return (
     <div className="about-page animate-fade-in">
       <section className="about-problem" aria-labelledby="about-problem-heading">
-        <div>
+        <header className="about-section-heading">
           <span className="about-section-number">01</span>
-          <h1 id="about-problem-heading">좋은 첫 이슈를 찾는 것부터 어렵기 때문에</h1>
-        </div>
-        <p>
-          <code>good first issue</code> 라벨만으로는 난이도, 프로젝트의 응답 속도, 이미 누군가 작업 중인지 알기 어렵습니다.
-          기여로는 단순히 이슈를 모으는 데서 끝나지 않고, 지금 시작할 만한 작업인지 판단하는 데 필요한 정보를 함께 보여줍니다.
-        </p>
+          <div>
+            <h1 id="about-problem-heading">좋은 첫 이슈를 찾는 것부터 어렵기 때문에</h1>
+            <p>
+              <code>good first issue</code> 라벨만으로는 난이도, 프로젝트의 응답 속도, 이미 누군가 작업 중인지 알기 어렵습니다.
+              기여로는 단순히 이슈를 모으는 데서 끝나지 않고, 지금 시작할 만한 작업인지 판단하는 데 필요한 정보를 함께 보여줍니다.
+            </p>
+          </div>
+        </header>
       </section>
 
       <section className="about-feature-section" aria-labelledby="about-feature-heading">

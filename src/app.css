@@ -6647,10 +6647,6 @@ body {
 }
 
 .about-problem {
-  display: grid;
-  grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
-  gap: 72px;
-  align-items: start;
   padding: 0 24px 56px;
   border-bottom: 1px solid var(--line);
 }
@@ -6676,13 +6672,6 @@ body {
   line-height: 1.35;
 }
 
-.about-problem > p {
-  margin: 23px 0 0;
-  color: #5f6964;
-  font-size: 16px;
-  line-height: 1.85;
-}
-
 .about-section-heading {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
@@ -6690,6 +6679,7 @@ body {
   align-items: start;
 }
 
+.about-section-heading h1,
 .about-section-heading h2 {
   margin-top: 0;
 }
