@@ -23,7 +23,6 @@ export function WorkspacePage() {
   const [pullRequestSyncResult, setPullRequestSyncResult] = useState(() => EMPTY_SYNC_RESULT);
   const [restoringPullRequestId, setRestoringPullRequestId] = useState("");
   const [portfolioCopied, setPortfolioCopied] = useState(false);
-  const autoSyncedLogin = useRef("");
   const {
     authUser,
     authLoading,
@@ -102,8 +101,6 @@ export function WorkspacePage() {
 
   useEffect(() => {
     if (authLoading || !authUser || workspaceLoading) return undefined;
-    if (autoSyncedLogin.current === authUser.login) return undefined;
-    autoSyncedLogin.current = authUser.login;
     const controller = new AbortController();
     void runPullRequestSync(false, false, controller.signal);
     return () => controller.abort();
