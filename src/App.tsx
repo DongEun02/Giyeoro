@@ -45,6 +45,8 @@ import {
 import type { WorkspaceItem } from "./services/userWorkspace";
 import {
   deleteRemoteWorkspaceItem,
+  restoreIgnoredPullRequest,
+  syncRemoteGithubPullRequests,
   syncWorkspaceItems,
   updateRemoteWorkspaceStatus,
   upsertWorkspaceItem
@@ -572,7 +574,7 @@ export default function App() {
     });
   };
 
-  const removeWorkspaceItem = (item: any) => {
+  const removeWorkspaceItem = async (item: any) => {
     if (authUser && workspaceLoading) return;
     const updatedItems = { ...trackedTasks };
     delete updatedItems[item.id];
@@ -584,10 +586,26 @@ export default function App() {
       return;
     }
 
-    void deleteRemoteWorkspaceItem(item.id).catch(error => {
+    try {
+      await deleteRemoteWorkspaceItem(item.id);
+    } catch (error) {
       setTrackedTasks(current => ({ ...current, [item.id]: item }));
       triggerToast(error instanceof Error ? error.message : "작업을 삭제하지 못했습니다.");
-    });
+      throw error;
+    }
+  };
+
+  const syncGithubPullRequests = async (force = false, signal?: AbortSignal) => {
+    if (!authUser) throw new Error("GitHub 로그인이 필요합니다.");
+    const result = await syncRemoteGithubPullRequests(force, signal);
+    setTrackedTasks(indexWorkspaceItems(result.items));
+    return result;
+  };
+
+  const restoreGithubPullRequest = async (itemId: string) => {
+    if (!authUser) throw new Error("GitHub 로그인이 필요합니다.");
+    await restoreIgnoredPullRequest(itemId);
+    return syncGithubPullRequests(true);
   };
 
   const savePullRequest = async (result: any) => {
@@ -1043,6 +1061,8 @@ export default function App() {
     setMyPageStatus,
     updateWorkspaceStatus,
     removeWorkspaceItem,
+    syncGithubPullRequests,
+    restoreGithubPullRequest,
     savePullRequest,
     openWorkspaceItem,
     selectedRepo,

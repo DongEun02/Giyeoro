@@ -5,7 +5,7 @@ import { getRepoVisual } from "../data/content";
 import { WORKSPACE_STATUSES } from "../services/userWorkspace";
 import type { WorkspaceItem } from "../services/userWorkspace";
 import type { AuthUser } from "../services/auth";
-import type { FormEvent } from "react";
+import type { IgnoredPullRequest } from "../services/workspace";
 
 type MyPageProps = {
   user: AuthUser;
@@ -19,12 +19,25 @@ type MyPageProps = {
   onOpenPortfolio: () => void;
   onSharePortfolio: () => void;
   portfolioCopied: boolean;
-  pullRequestUrl: string;
-  pullRequestLoading: boolean;
-  pullRequestError: string;
-  onPullRequestUrlChange: (value: string) => void;
-  onPullRequestSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  pullRequestSyncLoading: boolean;
+  pullRequestSyncError: string;
+  pullRequestSyncedAt: string;
+  pullRequestImportedCount: number;
+  pullRequestScannedCount: number;
+  pullRequestMinimumStars: number;
+  pullRequestSyncTruncated: boolean;
+  ignoredPullRequests: IgnoredPullRequest[];
+  restoringPullRequestId: string;
+  onPullRequestSync: () => void;
+  onRestorePullRequest: (item: IgnoredPullRequest) => void;
 };
+
+const syncDateFormatter = new Intl.DateTimeFormat("ko-KR", {
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit"
+});
 
 export const MyPage = ({
   user,
@@ -38,11 +51,17 @@ export const MyPage = ({
   onOpenPortfolio,
   onSharePortfolio,
   portfolioCopied,
-  pullRequestUrl,
-  pullRequestLoading,
-  pullRequestError,
-  onPullRequestUrlChange,
-  onPullRequestSubmit
+  pullRequestSyncLoading,
+  pullRequestSyncError,
+  pullRequestSyncedAt,
+  pullRequestImportedCount,
+  pullRequestScannedCount,
+  pullRequestMinimumStars,
+  pullRequestSyncTruncated,
+  ignoredPullRequests,
+  restoringPullRequestId,
+  onPullRequestSync,
+  onRestorePullRequest
 }: MyPageProps) => {
   const allItems = Object.values(items).sort((a, b) => (
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -57,6 +76,9 @@ export const MyPage = ({
     && (item.kind === "issue" || (item.kind === "pull_request" && item.data?.merged === true))
   )).length;
   const activeLabel = WORKSPACE_STATUSES.find(status => status.value === activeStatus)?.label || "저장한 작업";
+  const syncedAtLabel = pullRequestSyncedAt
+    ? syncDateFormatter.format(new Date(pullRequestSyncedAt))
+    : "아직 동기화 전";
 
   return (
     <div className="mypage animate-fade-in">
@@ -126,44 +148,56 @@ export const MyPage = ({
         </div>
       </section>
 
-      <section className="mypage-pr-import" aria-labelledby="mypage-pr-import-title">
-        <div className="mypage-pr-import-copy">
+      <section className="mypage-pr-sync" aria-labelledby="mypage-pr-sync-title">
+        <div className="mypage-pr-sync-copy">
           <span>GitHub Pull Request</span>
-          <h2 id="mypage-pr-import-title">기여한 PR 저장하기</h2>
-          <p>내가 작성한 PR 링크를 입력하면 현재 상태와 변경 정보를 불러와 작업실에 저장합니다.</p>
+          <h2 id="mypage-pr-sync-title">기여한 PR 자동으로 가져오기</h2>
+          <p>
+            내가 작성한 공개 PR 중 라이선스가 확인되고 별이 {pullRequestMinimumStars}개 이상인
+            오픈소스 저장소의 기여를 자동으로 찾아 저장합니다.
+          </p>
         </div>
-        <form className="mypage-pr-import-form" onSubmit={onPullRequestSubmit}>
-          <label htmlFor="mypage-pr-url">Pull Request URL</label>
-          <div>
-            <input
-              id="mypage-pr-url"
-              type="url"
-              inputMode="url"
-              value={pullRequestUrl}
-              onChange={event => onPullRequestUrlChange(event.target.value)}
-              placeholder="https://github.com/owner/repository/pull/123"
-              autoComplete="url"
-              autoCapitalize="none"
-              spellCheck={false}
-              disabled={pullRequestLoading}
-              aria-describedby={pullRequestError ? "mypage-pr-error" : "mypage-pr-note"}
-              aria-invalid={!!pullRequestError}
-              required
-            />
-            <button type="submit" disabled={pullRequestLoading || !pullRequestUrl.trim()}>
-              {pullRequestLoading ? "불러오는 중" : "PR 저장"}
-            </button>
+        <div className="mypage-pr-sync-actions">
+          <div className="mypage-pr-sync-status" aria-live="polite">
+            <span>{pullRequestSyncLoading ? "GitHub에서 확인 중" : `최근 동기화 ${syncedAtLabel}`}</span>
+            {pullRequestSyncedAt && !pullRequestSyncLoading ? (
+              <small>
+                {pullRequestScannedCount > 0 ? `최근 PR ${pullRequestScannedCount}개 확인 · ` : ""}
+                새로 저장 {pullRequestImportedCount}개
+                {pullRequestSyncTruncated ? " · 최근 300개 기준" : ""}
+              </small>
+            ) : null}
           </div>
-          {pullRequestError ? (
-            <p id="mypage-pr-error" className="mypage-pr-import-error" role="alert">
-              {pullRequestError}
-            </p>
-          ) : (
-            <p id="mypage-pr-note" className="mypage-pr-import-note">
-              현재 로그인한 GitHub 계정으로 만든 공개 오픈소스 PR을 저장할 수 있어요.
-            </p>
-          )}
-        </form>
+          <button type="button" onClick={onPullRequestSync} disabled={pullRequestSyncLoading}>
+            <Icons.Refresh className="w-3.5 h-3.5" />
+            {pullRequestSyncLoading ? "동기화 중" : "지금 새로고침"}
+          </button>
+        </div>
+        {pullRequestSyncError ? (
+          <p className="mypage-pr-sync-error" role="alert">{pullRequestSyncError}</p>
+        ) : null}
+        {ignoredPullRequests.length > 0 ? (
+          <details className="mypage-pr-ignored">
+            <summary>자동 가져오기에서 제외한 PR {ignoredPullRequests.length}개</summary>
+            <ul>
+              {ignoredPullRequests.map(item => (
+                <li key={item.id}>
+                  <div>
+                    <span>{item.repo}</span>
+                    <strong>{item.title}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onRestorePullRequest(item)}
+                    disabled={!!restoringPullRequestId}
+                  >
+                    {restoringPullRequestId === item.id ? "복구 중" : "다시 가져오기"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </section>
 
       <div className="mypage-status-tabs" role="tablist" aria-label="기여 진행 상태">
@@ -254,10 +288,12 @@ export const MyPage = ({
                       type="button"
                       className="mypage-remove-button"
                       onClick={() => onRemove(item)}
-                      aria-label={`${item.title} 목록에서 삭제`}
-                      title="목록에서 삭제"
+                      aria-label={`${item.title} ${item.kind === "pull_request" ? "삭제하고 자동 가져오기에서 제외" : "목록에서 삭제"}`}
+                      title={item.kind === "pull_request" ? "삭제 후 자동 가져오기에서 제외" : "목록에서 삭제"}
                     >
-                      <Icons.Bookmark filled className="w-4 h-4" />
+                      {item.kind === "pull_request"
+                        ? <Icons.Trash className="w-4 h-4" />
+                        : <Icons.Bookmark filled className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -268,7 +304,7 @@ export const MyPage = ({
           <div className="mypage-empty">
             <Icons.Bookmark className="w-5 h-5" />
             <strong>{activeLabel}가 없습니다.</strong>
-            <p>이슈를 북마크하거나 위에서 내가 기여한 PR을 등록해 보세요.</p>
+            <p>이슈를 북마크하거나 위에서 GitHub PR을 동기화해 보세요.</p>
             <button type="button" onClick={onBrowse}>이슈 둘러보기</button>
           </div>
         )}

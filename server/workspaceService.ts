@@ -11,7 +11,7 @@ type WorkspaceServiceOptions = GithubAuthOptions & {
 type WorkspaceStatus = "interested" | "in_progress" | "completed";
 type WorkspaceKind = "issue" | "translation" | "pull_request";
 
-type WorkspaceItem = {
+export type WorkspaceItem = {
   id: string;
   kind: WorkspaceKind;
   status: WorkspaceStatus;
@@ -162,7 +162,7 @@ const mapRow = (row: WorkspaceRow): WorkspaceItem => ({
     : {}
 });
 
-const upsertUser = async (database: Database, user: GithubUser) => {
+export const upsertWorkspaceUser = async (database: Database, user: GithubUser) => {
   await database.execute(sql`
     INSERT INTO users (github_id, github_login, name, avatar_url, profile_url)
     VALUES (${user.id}, ${user.login}, ${user.name}, ${user.avatarUrl}, ${user.profileUrl})
@@ -175,7 +175,7 @@ const upsertUser = async (database: Database, user: GithubUser) => {
   `);
 };
 
-const upsertItem = async (database: Database, userId: number, item: WorkspaceItem) => {
+export const upsertWorkspaceItem = async (database: Database, userId: number, item: WorkspaceItem) => {
   await database.execute(sql`
     INSERT INTO workspace_items (
       user_id, item_id, kind, status, repo, title, summary, difficulty,
@@ -202,7 +202,7 @@ const upsertItem = async (database: Database, userId: number, item: WorkspaceIte
   `);
 };
 
-const listItems = async (database: Database, userId: number) => {
+export const listWorkspaceItems = async (database: Database, userId: number) => {
   const result = await database.execute<WorkspaceRow>(sql`
     SELECT item_id, kind, status, repo, title, summary, difficulty, work_type,
       language_tags, saved_at, updated_at, url, data
@@ -227,10 +227,10 @@ export const handleWorkspaceRequest = async (
   const database = getDatabase(databaseUrl);
 
   try {
-    await upsertUser(database, user);
+    await upsertWorkspaceUser(database, user);
 
     if (request.method === "GET") {
-      return jsonResponse(response, 200, { items: await listItems(database, user.id) });
+      return jsonResponse(response, 200, { items: await listWorkspaceItems(database, user.id) });
     }
 
     if (request.method === "POST") {
@@ -242,15 +242,15 @@ export const handleWorkspaceRequest = async (
       if (items.some(item => !item)) {
         return jsonResponse(response, 400, { error: "저장할 작업 데이터가 올바르지 않습니다." });
       }
-      await Promise.all((items as WorkspaceItem[]).map(item => upsertItem(database, user.id, item)));
-      return jsonResponse(response, 200, { items: await listItems(database, user.id) });
+      await Promise.all((items as WorkspaceItem[]).map(item => upsertWorkspaceItem(database, user.id, item)));
+      return jsonResponse(response, 200, { items: await listWorkspaceItems(database, user.id) });
     }
 
     if (request.method === "PUT") {
       const body = await readJsonBody(request) as { item?: unknown };
       const item = parseWorkspaceItem(body.item);
       if (!item) return jsonResponse(response, 400, { error: "저장할 작업 데이터가 올바르지 않습니다." });
-      await upsertItem(database, user.id, item);
+      await upsertWorkspaceItem(database, user.id, item);
       return jsonResponse(response, 200, { item });
     }
 
@@ -275,7 +275,22 @@ export const handleWorkspaceRequest = async (
       const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
       const id = text(requestUrl.searchParams.get("id"), 300);
       if (!id) return jsonResponse(response, 400, { error: "삭제할 작업 ID가 필요합니다." });
-      await database.execute(sql`DELETE FROM workspace_items WHERE user_id = ${user.id} AND item_id = ${id}`);
+      await database.execute(sql`
+        WITH removed AS (
+          DELETE FROM workspace_items
+          WHERE user_id = ${user.id} AND item_id = ${id}
+          RETURNING item_id, kind, repo, title, url
+        )
+        INSERT INTO workspace_ignored_items (user_id, item_id, kind, repo, title, url)
+        SELECT ${user.id}, item_id, kind, repo, title, url
+        FROM removed
+        WHERE kind = 'pull_request'
+        ON CONFLICT (user_id, item_id) DO UPDATE SET
+          repo = EXCLUDED.repo,
+          title = EXCLUDED.title,
+          url = EXCLUDED.url,
+          ignored_at = NOW()
+      `);
       return jsonResponse(response, 200, { ok: true });
     }
 

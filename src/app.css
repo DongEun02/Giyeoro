@@ -5501,7 +5501,7 @@ body {
   background: #f6f8ff;
 }
 
-.mypage-pr-import {
+.mypage-pr-sync {
   display: grid;
   grid-template-columns: minmax(230px, .8fr) minmax(420px, 1.4fr);
   align-items: center;
@@ -5514,7 +5514,7 @@ body {
     #fafafa;
 }
 
-.mypage-pr-import-copy > span {
+.mypage-pr-sync-copy > span {
   color: var(--accent-warm);
   font-size: 9px;
   font-weight: 800;
@@ -5522,7 +5522,7 @@ body {
   text-transform: uppercase;
 }
 
-.mypage-pr-import-copy h2 {
+.mypage-pr-sync-copy h2 {
   margin: 7px 0 0;
   color: #171717;
   font-size: 17px;
@@ -5530,59 +5530,46 @@ body {
   line-height: 1.4;
 }
 
-.mypage-pr-import-copy p {
+.mypage-pr-sync-copy p {
   margin: 7px 0 0;
   color: #747474;
   font-size: 10px;
   line-height: 1.65;
 }
 
-.mypage-pr-import-form {
+.mypage-pr-sync-actions {
   min-width: 0;
-}
-
-.mypage-pr-import-form > label {
-  display: block;
-  margin-bottom: 7px;
-  color: #555555;
-  font-size: 9px;
-  font-weight: 750;
-}
-
-.mypage-pr-import-form > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 8px;
 }
 
-.mypage-pr-import-form input {
+.mypage-pr-sync-status {
   min-width: 0;
-  height: 42px;
-  padding: 0 13px;
-  border: 1px solid #d5d5d5;
-  border-radius: 8px;
-  outline: none;
-  background: #ffffff;
-  color: #222222;
+  display: grid;
+  gap: 4px;
+}
+
+.mypage-pr-sync-status > span {
+  color: #333333;
   font-size: 10px;
+  font-weight: 800;
 }
 
-.mypage-pr-import-form input::placeholder {
-  color: #aaaaaa;
+.mypage-pr-sync-status > small {
+  color: #888888;
+  font-size: 9px;
+  line-height: 1.5;
 }
 
-.mypage-pr-import-form input:focus {
-  border-color: #777777;
-  box-shadow: 0 0 0 3px rgba(23, 23, 23, .07);
-}
-
-.mypage-pr-import-form input[aria-invalid="true"] {
-  border-color: #c94a3a;
-}
-
-.mypage-pr-import-form button {
-  min-width: 88px;
+.mypage-pr-sync-actions > button {
+  min-width: 112px;
   height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 0 15px;
   border: 1px solid #171717;
   border-radius: 8px;
@@ -5593,30 +5580,90 @@ body {
   white-space: nowrap;
 }
 
-.mypage-pr-import-form button:hover:not(:disabled) {
+.mypage-pr-sync-actions > button:hover:not(:disabled) {
   background: #333333;
 }
 
-.mypage-pr-import-form button:disabled,
-.mypage-pr-import-form input:disabled {
+.mypage-pr-sync-actions > button:disabled,
+.mypage-pr-ignored button:disabled {
   cursor: not-allowed;
   opacity: .55;
 }
 
-.mypage-pr-import-note,
-.mypage-pr-import-error {
-  margin: 7px 0 0;
+.mypage-pr-sync-error {
+  grid-column: 1 / -1;
+  margin: -22px 0 0;
+  color: #b83c2e;
   font-size: 9px;
+  font-weight: 650;
   line-height: 1.5;
 }
 
-.mypage-pr-import-note {
-  color: #888888;
+.mypage-pr-ignored {
+  grid-column: 1 / -1;
+  padding-top: 15px;
+  border-top: 1px solid #e3e3e3;
 }
 
-.mypage-pr-import-error {
-  color: #b83c2e;
-  font-weight: 650;
+.mypage-pr-ignored summary {
+  width: fit-content;
+  color: #555555;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.mypage-pr-ignored ul {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mypage-pr-ignored li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.mypage-pr-ignored li > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.mypage-pr-ignored li span,
+.mypage-pr-ignored li strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mypage-pr-ignored li span {
+  color: #888888;
+  font-size: 8px;
+}
+
+.mypage-pr-ignored li strong {
+  color: #333333;
+  font-size: 9px;
+}
+
+.mypage-pr-ignored li button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d5d5d5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #333333;
+  font-size: 9px;
+  font-weight: 750;
 }
 
 .mypage-status-tabs {
@@ -7178,7 +7225,7 @@ body {
     gap: 22px;
   }
 
-  .mypage-pr-import {
+  .mypage-pr-sync {
     grid-template-columns: 1fr;
     gap: 20px;
   }
@@ -7422,15 +7469,27 @@ body {
     padding: 22px 0;
   }
 
-  .mypage-pr-import {
+  .mypage-pr-sync {
     padding: 22px 18px;
   }
 
-  .mypage-pr-import-form > div {
+  .mypage-pr-sync-actions {
     grid-template-columns: 1fr;
   }
 
-  .mypage-pr-import-form button {
+  .mypage-pr-sync-actions > button {
+    width: 100%;
+  }
+
+  .mypage-pr-sync-error {
+    margin-top: 0;
+  }
+
+  .mypage-pr-ignored li {
+    grid-template-columns: 1fr;
+  }
+
+  .mypage-pr-ignored li button {
     width: 100%;
   }
 

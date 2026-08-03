@@ -4,6 +4,25 @@ type WorkspaceItemsResponse = {
   items: WorkspaceItem[];
 };
 
+export type IgnoredPullRequest = {
+  id: string;
+  repo: string;
+  title: string;
+  url: string;
+  ignoredAt: string;
+};
+
+export type PullRequestSyncResult = WorkspaceItemsResponse & {
+  ignoredItems: IgnoredPullRequest[];
+  minimumStars: number;
+  synced: boolean;
+  syncedAt: string;
+  importedCount: number;
+  updatedCount: number;
+  scannedCount: number;
+  truncated: boolean;
+};
+
 const parseError = async (response: Response, fallback: string) => {
   const body = await response.json().catch(() => null) as { error?: string } | null;
   return body?.error || fallback;
@@ -51,4 +70,20 @@ export const deleteRemoteWorkspaceItem = async (id: string) => {
   await request<{ ok: true }>(`/api/workspace?id=${encodeURIComponent(id)}`, {
     method: "DELETE"
   }, "작업을 삭제하지 못했습니다.");
+};
+
+export const syncRemoteGithubPullRequests = async (
+  force = false,
+  signal?: AbortSignal
+) => request<PullRequestSyncResult>(
+  `/api/workspace?operation=sync-pull-requests${force ? "&force=1" : ""}`,
+  { method: "POST", signal },
+  "GitHub에서 기여한 PR을 동기화하지 못했습니다."
+);
+
+export const restoreIgnoredPullRequest = async (id: string) => {
+  await request<{ ok: true }>("/api/workspace?operation=sync-pull-requests", {
+    method: "PATCH",
+    body: JSON.stringify({ id })
+  }, "제외한 PR을 복구하지 못했습니다.");
 };
