@@ -5893,6 +5893,60 @@ body {
   color: #3366ff;
 }
 
+.mypage-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 24px;
+}
+
+.mypage-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.mypage-pagination button {
+  min-width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #676767;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.mypage-pagination button:hover:not(:disabled) {
+  border-color: #d7d9db;
+  background: #f7f7f7;
+  color: #202124;
+}
+
+.mypage-pagination button.mypage-pagination-active {
+  border-color: #3366ff;
+  background: #3366ff;
+  color: #ffffff;
+}
+
+.mypage-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: .35;
+}
+
+.mypage-pagination > div > span {
+  min-width: 20px;
+  color: #9a9a9a;
+  font-size: 11px;
+  text-align: center;
+}
+
 .mypage-empty {
   min-height: 250px;
   display: flex;

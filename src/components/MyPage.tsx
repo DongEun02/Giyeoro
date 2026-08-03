@@ -1,4 +1,4 @@
-import React from "react";
+import { useEffect, useRef, useState } from "react";
 import { BrandMark } from "./BrandMark";
 import { Icons } from "./Icons";
 import { getRepoVisual } from "../data/content";
@@ -39,6 +39,25 @@ const syncDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   minute: "2-digit"
 });
 
+const PAGE_SIZE = 20;
+
+const createPageItems = (currentPage: number, totalPages: number) => {
+  const pages = Array.from(new Set([
+    1,
+    totalPages,
+    currentPage - 1,
+    currentPage,
+    currentPage + 1
+  ].filter(page => page >= 1 && page <= totalPages))).sort((a, b) => a - b);
+
+  return pages.flatMap((page, index) => {
+    const previousPage = pages[index - 1];
+    return index > 0 && page - previousPage > 1
+      ? [`ellipsis-${previousPage}-${page}`, page]
+      : [page];
+  });
+};
+
 export const MyPage = ({
   user,
   items,
@@ -63,6 +82,8 @@ export const MyPage = ({
   onPullRequestSync,
   onRestorePullRequest
 }: MyPageProps) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const workspaceHeadingRef = useRef<HTMLDivElement>(null);
   const allItems = Object.values(items).sort((a, b) => (
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   ));
@@ -71,6 +92,13 @@ export const MyPage = ({
     [status.value]: allItems.filter(item => item.status === status.value).length
   }), {} as Record<string, number>);
   const visibleItems = allItems.filter(item => item.status === activeStatus);
+  const totalPages = Math.max(1, Math.ceil(visibleItems.length / PAGE_SIZE));
+  const activePage = Math.min(currentPage, totalPages);
+  const paginatedItems = visibleItems.slice(
+    (activePage - 1) * PAGE_SIZE,
+    activePage * PAGE_SIZE
+  );
+  const pageItems = createPageItems(activePage, totalPages);
   const publicItemCount = allItems.filter(item => (
     item.status === "completed"
     && (item.kind === "issue" || (item.kind === "pull_request" && item.data?.merged === true))
@@ -79,6 +107,23 @@ export const MyPage = ({
   const syncedAtLabel = pullRequestSyncedAt
     ? syncDateFormatter.format(new Date(pullRequestSyncedAt))
     : "아직 동기화 전";
+
+  useEffect(() => {
+    setCurrentPage(page => Math.min(page, totalPages));
+  }, [totalPages]);
+
+  const handleStatusTabChange = (status: string) => {
+    setCurrentPage(1);
+    onActiveStatusChange(status);
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page === activePage || page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    window.requestAnimationFrame(() => {
+      workspaceHeadingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   return (
     <div className="mypage animate-fade-in">
@@ -207,7 +252,7 @@ export const MyPage = ({
             type="button"
             role="tab"
             aria-selected={activeStatus === status.value}
-            onClick={() => onActiveStatusChange(status.value)}
+            onClick={() => handleStatusTabChange(status.value)}
             className={activeStatus === status.value ? "mypage-status-tab-active" : ""}
           >
             <span>{status.label}</span>
@@ -217,15 +262,19 @@ export const MyPage = ({
       </div>
 
       <section className="mypage-workspace" aria-labelledby="mypage-list-heading">
-        <div className="mypage-list-heading">
+        <div className="mypage-list-heading" ref={workspaceHeadingRef}>
           <h2 id="mypage-list-heading">{activeLabel}</h2>
-          <span>{visibleItems.length}개</span>
+          <span>
+            {visibleItems.length}개
+            {totalPages > 1 ? ` · ${activePage}/${totalPages} 페이지` : ""}
+          </span>
         </div>
 
         {visibleItems.length > 0 ? (
-          <div className="mypage-list">
-            {visibleItems.map(item => (
-              <article className="mypage-item" key={item.id}>
+          <>
+            <div className="mypage-list">
+              {paginatedItems.map(item => (
+                <article className="mypage-item" key={item.id}>
                 <img
                   src={item.data?.repositoryAvatarUrl || getRepoVisual(item.repo).image}
                   alt=""
@@ -297,9 +346,48 @@ export const MyPage = ({
                     </button>
                   </div>
                 </div>
-              </article>
-            ))}
-          </div>
+                </article>
+              ))}
+            </div>
+            {totalPages > 1 ? (
+              <nav className="mypage-pagination" aria-label={`${activeLabel} 페이지 이동`}>
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(activePage - 1)}
+                  disabled={activePage === 1}
+                  aria-label="이전 페이지"
+                >
+                  <Icons.ArrowLeft className="w-3.5 h-3.5" />
+                  <span>이전</span>
+                </button>
+                <div>
+                  {pageItems.map(page => typeof page === "number" ? (
+                    <button
+                      key={page}
+                      type="button"
+                      className={page === activePage ? "mypage-pagination-active" : ""}
+                      aria-current={page === activePage ? "page" : undefined}
+                      aria-label={`${page}페이지`}
+                      onClick={() => handlePageChange(page)}
+                    >
+                      {page}
+                    </button>
+                  ) : (
+                    <span key={page} aria-hidden="true">…</span>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(activePage + 1)}
+                  disabled={activePage === totalPages}
+                  aria-label="다음 페이지"
+                >
+                  <span>다음</span>
+                  <Icons.ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </nav>
+            ) : null}
+          </>
         ) : (
           <div className="mypage-empty">
             <Icons.Bookmark className="w-5 h-5" />
