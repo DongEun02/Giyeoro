@@ -1173,7 +1173,7 @@ export default function App() {
           </div>
         )}
 
-        {view !== "landing" && <header className="app-header">
+        {view !== "landing" && <header className={`app-header ${view === "portfolio" ? "app-header-portfolio" : ""}`}>
           <div className="app-header-inner max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
             <button type="button" className="app-brand flex items-center gap-3" onClick={() => setView("landing")}>
               <span className="brand-mark"><BrandMark /></span>
@@ -1183,28 +1183,32 @@ export default function App() {
               </span>
             </button>
 
-            <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴">
-              <button type="button" onClick={() => setView("about")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "about" ? "nav-button-active" : ""}`}>서비스 소개</button>
-              <button type="button" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "feature" || view === "translation" ? "nav-button-active" : ""}`}>첫 기여 찾기</button>
-              <button type="button" onClick={() => setView("guide")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "guide" ? "nav-button-active" : ""}`}>기여 가이드</button>
-              {authUser && (
-                <button type="button" onClick={() => setView("mypage")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "mypage" ? "nav-button-active" : ""}`}>마이페이지</button>
-              )}
-            </nav>
+            {view !== "portfolio" && (
+              <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴">
+                <button type="button" onClick={() => setView("about")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "about" ? "nav-button-active" : ""}`}>서비스 소개</button>
+                <button type="button" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "feature" || view === "translation" ? "nav-button-active" : ""}`}>첫 기여 찾기</button>
+                <button type="button" onClick={() => setView("guide")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "guide" ? "nav-button-active" : ""}`}>기여 가이드</button>
+                {authUser && (
+                  <button type="button" onClick={() => setView("mypage")} className={`nav-button text-xs px-3 py-1.5 transition-all ${view === "mypage" ? "nav-button-active" : ""}`}>마이페이지</button>
+                )}
+              </nav>
+            )}
 
-            <div className="header-actions">
-              <button type="button" aria-label="첫 기여 찾기" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className="header-search-button">
-                <Icons.Search className="w-4 h-4" />
-              </button>
-              <GitHubAuthControl
-                user={authUser}
-                loading={authLoading}
-                loggingOut={authLogoutLoading}
-                loginHref={getGithubLoginUrl(`${location.pathname}${location.search}${location.hash}`)}
-                onLogin={handleGithubLogin}
-                onLogout={handleGithubLogout}
-              />
-            </div>
+            {view !== "portfolio" && (
+              <div className="header-actions">
+                <button type="button" aria-label="첫 기여 찾기" onClick={() => { setFeatureSourceMode("category"); setView("feature"); }} className="header-search-button">
+                  <Icons.Search className="w-4 h-4" />
+                </button>
+                <GitHubAuthControl
+                  user={authUser}
+                  loading={authLoading}
+                  loggingOut={authLogoutLoading}
+                  loginHref={getGithubLoginUrl(`${location.pathname}${location.search}${location.hash}`)}
+                  onLogin={handleGithubLogin}
+                  onLogout={handleGithubLogout}
+                />
+              </div>
+            )}
           </div>
         </header>}
 
@@ -1224,7 +1228,7 @@ export default function App() {
           </Routes>
         </main>
 
-        {view !== "landing" && <footer className="app-footer">
+        {view !== "landing" && view !== "portfolio" && <footer className="app-footer">
           <div className="app-footer-inner">
             <div className="app-footer-top">
               <div className="app-footer-brand">
