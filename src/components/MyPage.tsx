@@ -34,6 +34,7 @@ type RepositoryGroup = {
   additions: number;
   deletions: number;
   changedFiles: number;
+  repositoryStars: number;
   avatarUrl: string;
   languageTags: string[];
   lastUpdatedAt: string;
@@ -64,11 +65,15 @@ const groupPullRequests = (items: Record<string, WorkspaceItem>): RepositoryGrou
       additions: sorted.reduce((sum, item) => sum + Number(item.data?.additions || 0), 0),
       deletions: sorted.reduce((sum, item) => sum + Number(item.data?.deletions || 0), 0),
       changedFiles: sorted.reduce((sum, item) => sum + Number(item.data?.changedFiles || 0), 0),
+      repositoryStars: Math.max(...sorted.map(item => Number(item.data?.repositoryStars || 0))),
       avatarUrl: String(sorted[0]?.data?.repositoryAvatarUrl || ""),
       languageTags: Array.from(new Set(sorted.flatMap(item => item.languageTags))).slice(0, 3),
       lastUpdatedAt: String(sorted[0]?.data?.mergedAt || sorted[0]?.updatedAt || "")
     };
-  }).sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
+  }).sort((a, b) => (
+    b.repositoryStars - a.repositoryStars
+    || new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime()
+  ));
 };
 
 export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio, portfolioCopied,
@@ -134,7 +139,7 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
           return <article className="contribution-project-card" key={project.repo}>
             <header>
               <img src={project.avatarUrl || getRepoVisual(project.repo).image} alt="" referrerPolicy="no-referrer" />
-              <div className="contribution-project-title"><span>{project.languageTags.join(" · ") || "Open Source"}</span><h3>{project.repo}</h3><p>{project.mergedCount}개 병합 · {project.openCount}개 진행 중 · 변경 파일 {project.changedFiles}개</p></div>
+              <div className="contribution-project-title"><span>{project.languageTags.join(" · ") || "Open Source"}</span><h3>{project.repo}</h3><p>★ {project.repositoryStars.toLocaleString()} · {project.mergedCount}개 병합 · {project.openCount}개 진행 중 · 변경 파일 {project.changedFiles}개</p></div>
               <div className="contribution-project-diff" aria-label={`추가 ${project.additions.toLocaleString()}줄, 삭제 ${project.deletions.toLocaleString()}줄`}><span className="contribution-additions">+{project.additions.toLocaleString()}</span><span className="contribution-deletions">-{project.deletions.toLocaleString()}</span></div>
               <button type="button" className="contribution-hide-button" onClick={() => onHideRepository(project.repo)} disabled={!!updatingRepository}>{updatingRepository === project.repo ? "숨기는 중" : "프로젝트 숨기기"}</button>
             </header>
