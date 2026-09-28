@@ -6,6 +6,7 @@ import { GitHubAuthControl } from "./components/GitHubAuthControl";
 import { Icons } from "./components/Icons";
 import { LandingPage } from "./pages/LandingPage";
 import { PortfolioPage } from "./pages/PortfolioPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { initializeAnalytics, trackAnalyticsEvent } from "./services/analytics";
 import { fetchAuthSession, getGithubLoginUrl, logoutGithub } from "./services/auth";
@@ -24,7 +25,9 @@ export default function App() {
   const navigate = useNavigate();
   const view = location.pathname.startsWith("/mypage")
     ? "mypage"
-    : location.pathname.startsWith("/portfolio") ? "portfolio" : "landing";
+    : location.pathname.startsWith("/portfolio")
+      ? "portfolio"
+      : location.pathname.startsWith("/privacy") ? "privacy" : "landing";
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authLogoutLoading, setAuthLogoutLoading] = useState(false);
@@ -154,8 +157,8 @@ export default function App() {
         {view !== "landing" ? <header className={`app-header ${view === "portfolio" ? "app-header-portfolio" : ""}`}>
           <div className="app-header-inner max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
             <button type="button" className="app-brand flex items-center gap-3" onClick={() => navigate("/")}><span className="brand-mark"><BrandMark /></span><span className="brand-name font-bold text-[#1f2933] text-sm tracking-tight">기여로</span></button>
-            {view !== "portfolio" && authUser ? <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴"><button type="button" onClick={() => navigate("/mypage")} className="nav-button nav-button-active text-xs px-3 py-1.5">내 기여</button><button type="button" onClick={() => navigate(`/portfolio/${encodeURIComponent(authUser.login)}`)} className="nav-button text-xs px-3 py-1.5">공개 페이지</button></nav> : null}
-            {view !== "portfolio" ? <GitHubAuthControl user={authUser} loading={authLoading} loggingOut={authLogoutLoading} loginHref={getGithubLoginUrl(`${location.pathname}${location.search}${location.hash}`)} onLogin={() => trackAnalyticsEvent("login", { method: "github" })} onLogout={handleGithubLogout} /> : null}
+            {view === "mypage" && authUser ? <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴"><button type="button" onClick={() => navigate("/mypage")} className="nav-button nav-button-active text-xs px-3 py-1.5">내 기여</button><button type="button" onClick={() => navigate(`/portfolio/${encodeURIComponent(authUser.login)}`)} className="nav-button text-xs px-3 py-1.5">공개 페이지</button></nav> : null}
+            {view === "mypage" ? <GitHubAuthControl user={authUser} loading={authLoading} loggingOut={authLogoutLoading} loginHref={getGithubLoginUrl(`${location.pathname}${location.search}${location.hash}`)} onLogin={() => trackAnalyticsEvent("login", { method: "github" })} onLogout={handleGithubLogout} /> : null}
           </div>
         </header> : null}
 
@@ -164,11 +167,12 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/mypage" element={<WorkspacePage />} />
             <Route path="/portfolio/:login" element={<PortfolioPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
 
-        {view === "mypage" ? <footer className="app-footer"><div className="app-footer-inner"><div className="app-footer-top"><div className="app-footer-brand"><span className="brand-mark"><BrandMark /></span><strong>기여로</strong></div><div className="app-footer-links"><Link to="/mypage">내 기여</Link><a href="#">개인정보 처리방침</a><a href="#">문의하기</a></div></div><p>오픈소스 기여를 기록하는 가장 간단한 방법. © 2026 기여로</p></div></footer> : null}
+        {view === "mypage" || view === "privacy" ? <footer className="app-footer"><div className="app-footer-inner"><div className="app-footer-top"><div className="app-footer-brand"><span className="brand-mark"><BrandMark /></span><strong>기여로</strong></div><div className="app-footer-links"><Link to="/mypage">내 기여</Link><Link to="/privacy">개인정보 처리방침</Link><a href="mailto:imde0205@gmail.com">문의하기</a></div></div><p>오픈소스 기여를 기록하는 가장 간단한 방법. © 2026 기여로</p></div></footer> : null}
       </div>
     </OssAppProvider>
   );

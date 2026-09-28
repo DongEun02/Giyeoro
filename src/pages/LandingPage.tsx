@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BrandMark } from "../components/BrandMark";
 import { Icons } from "../components/Icons";
 
@@ -29,7 +29,7 @@ export function LandingPage() {
           <div className="contribution-preview-list">{SAMPLE_PROJECTS.map(project => <article key={project.repo}><img className="contribution-preview-icon" src={project.icon} alt={`${project.repo} 프로젝트 아이콘`} width="44" height="44" referrerPolicy="no-referrer" /><div><span>{project.language}</span><h3>{project.repo}</h3><p>병합된 Pull Request {project.count}개</p></div><strong>+{project.additions}</strong><Icons.ArrowRight className="w-4 h-4" /></article>)}</div>
         </section>
       </main>
-      <footer>© 2026 기여로 · 오픈소스 기여를 기록하는 가장 간단한 방법</footer>
+      <footer><span>© 2026 기여로 · 오픈소스 기여를 기록하는 가장 간단한 방법</span><nav aria-label="하단 메뉴"><Link to="/privacy">개인정보 처리방침</Link><a href="mailto:imde0205@gmail.com">문의하기</a></nav></footer>
     </div>
   );
 }

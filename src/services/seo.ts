@@ -13,6 +13,14 @@ const DEFAULT_SEO: SeoConfig = {
 };
 
 function getSeoConfig(pathname: string): SeoConfig {
+  if (pathname.startsWith("/privacy")) {
+    return {
+      title: "개인정보 처리방침 | 기여로",
+      description: "기여로가 개인정보를 수집하고 이용하며 보호하는 방법을 확인하세요.",
+      canonicalPath: "/privacy"
+    };
+  }
+
   if (pathname.startsWith("/about")) {
     return {
       title: "서비스 소개 | 기여로",
