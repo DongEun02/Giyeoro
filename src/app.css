@@ -8847,3 +8847,17 @@ body {
     width: 34px;
   }
 }
+
+.contribution-section-heading h2,
+.portfolio-contributions > header h2 {
+  font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 800;
+  letter-spacing: -.035em;
+}
+
+.contribution-project-title h3,
+.portfolio-project-card h3 {
+  font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
