@@ -3,9 +3,9 @@ import { BrandMark } from "../components/BrandMark";
 import { Icons } from "../components/Icons";
 
 const SAMPLE_PROJECTS = [
-  { repo: "vercel/next.js", count: 18, additions: "2,840", language: "TypeScript" },
-  { repo: "facebook/react", count: 7, additions: "1,120", language: "JavaScript" },
-  { repo: "rust-lang/rust", count: 4, additions: "680", language: "Rust" }
+  { repo: "vercel/next.js", count: 18, additions: "2,840", language: "TypeScript", icon: "https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0/icons/nextjs/nextjs-original.svg" },
+  { repo: "facebook/react", count: 7, additions: "1,120", language: "JavaScript", icon: "https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0/icons/react/react-original.svg" },
+  { repo: "rust-lang/rust", count: 4, additions: "680", language: "Rust", icon: "https://cdn.jsdelivr.net/gh/devicons/devicon@v2.17.0/icons/rust/rust-original.svg" }
 ];
 
 export function LandingPage() {
@@ -26,7 +26,7 @@ export function LandingPage() {
         </section>
         <section className="contribution-landing-preview" aria-label="프로젝트별 기여 포트폴리오 예시">
           <div className="contribution-preview-header"><div><span>Open Source Contributions</span><h2>프로젝트별 기여</h2></div><strong>29 Merged PRs</strong></div>
-          <div className="contribution-preview-list">{SAMPLE_PROJECTS.map(project => <article key={project.repo}><div className="contribution-preview-icon"><Icons.GitPullRequest className="w-5 h-5" /></div><div><span>{project.language}</span><h3>{project.repo}</h3><p>병합된 Pull Request {project.count}개</p></div><strong>+{project.additions}</strong><Icons.ArrowRight className="w-4 h-4" /></article>)}</div>
+          <div className="contribution-preview-list">{SAMPLE_PROJECTS.map(project => <article key={project.repo}><img className="contribution-preview-icon" src={project.icon} alt={`${project.repo} 프로젝트 아이콘`} width="44" height="44" referrerPolicy="no-referrer" /><div><span>{project.language}</span><h3>{project.repo}</h3><p>병합된 Pull Request {project.count}개</p></div><strong>+{project.additions}</strong><Icons.ArrowRight className="w-4 h-4" /></article>)}</div>
         </section>
       </main>
       <footer>© 2026 기여로 · 오픈소스 기여를 기록하는 가장 간단한 방법</footer>
