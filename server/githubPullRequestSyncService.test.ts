@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isEligibleContributionPullRequest } from "./githubPullRequestSyncService.js";
+import {
+  fetchAuthoredPullRequests,
+  isEligibleContributionPullRequest
+} from "./githubPullRequestSyncService.js";
 
 const contribution = (overrides: Record<string, unknown> = {}) => ({
   number: 12,
@@ -47,4 +50,33 @@ test("병합된 PR은 허용한다", () => {
     state: "MERGED",
     merged: true
   }), "contributor"), true);
+});
+
+test("GitHub가 빈 응답을 반환하면 다시 요청한다", async t => {
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    if (requestCount === 1) return new Response("", { status: 200 });
+    return Response.json({
+      data: {
+        search: {
+          nodes: [contribution()],
+          pageInfo: { hasNextPage: false, endCursor: null }
+        }
+      }
+    });
+  };
+
+  const result = await fetchAuthoredPullRequests({
+    id: 1,
+    login: "contributor",
+    name: "Contributor",
+    avatarUrl: "",
+    profileUrl: ""
+  }, "token");
+
+  assert.equal(requestCount, 2);
+  assert.equal(result.nodes.length, 1);
 });

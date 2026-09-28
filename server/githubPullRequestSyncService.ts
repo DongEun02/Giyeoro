@@ -84,6 +84,8 @@ const MINIMUM_STARS = 50;
 const SYNC_TTL_MS = 24 * 60 * 60 * 1_000;
 const PAGE_SIZE = 100;
 const MAX_PAGES = 3;
+const GITHUB_FETCH_ATTEMPTS = 3;
+const GITHUB_RETRY_DELAY_MS = 250;
 
 const PULL_REQUEST_SEARCH_QUERY = `
   query AuthoredPullRequests($query: String!, $first: Int!, $after: String) {
@@ -247,30 +249,55 @@ const githubHeaders = (githubToken: string) => ({
   "X-GitHub-Api-Version": GITHUB_API_VERSION
 });
 
+const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+const fetchGithubPullRequestPage = async (
+  user: GithubUser,
+  githubToken: string,
+  cursor: string | null
+) => {
+  for (let attempt = 1; attempt <= GITHUB_FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const githubResponse = await fetch("https://api.github.com/graphql", {
+        method: "POST",
+        headers: githubHeaders(githubToken),
+        body: JSON.stringify({
+          query: PULL_REQUEST_SEARCH_QUERY,
+          variables: {
+            query: `is:pr author:${user.login} sort:updated-desc`,
+            first: PAGE_SIZE,
+            after: cursor
+          }
+        }),
+        signal: AbortSignal.timeout(25_000)
+      });
+      if (githubResponse.status === 403 || githubResponse.status === 429) {
+        throw new Error("GITHUB_RATE_LIMIT");
+      }
+      if (!githubResponse.ok) throw new Error("GITHUB_FETCH_FAILED");
+
+      const rawPayload = await githubResponse.text();
+      if (!rawPayload.trim()) throw new Error("GITHUB_EMPTY_RESPONSE");
+      const payload = JSON.parse(rawPayload) as PullRequestSearchPayload;
+      if (payload.errors?.length || !payload.data?.search) throw new Error("GITHUB_FETCH_FAILED");
+      return payload;
+    } catch (error) {
+      if (error instanceof Error && error.message === "GITHUB_RATE_LIMIT") throw error;
+      if (attempt === GITHUB_FETCH_ATTEMPTS) throw new Error("GITHUB_FETCH_FAILED", { cause: error });
+      await wait(GITHUB_RETRY_DELAY_MS * attempt);
+    }
+  }
+
+  throw new Error("GITHUB_FETCH_FAILED");
+};
+
 export const fetchAuthoredPullRequests = async (user: GithubUser, githubToken: string) => {
   const nodes: PullRequestNode[] = [];
   let cursor: string | null = null;
   let truncated = false;
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
-    const githubResponse: Response = await fetch("https://api.github.com/graphql", {
-      method: "POST",
-      headers: githubHeaders(githubToken),
-      body: JSON.stringify({
-        query: PULL_REQUEST_SEARCH_QUERY,
-        variables: {
-          query: `is:pr author:${user.login} sort:updated-desc`,
-          first: PAGE_SIZE,
-          after: cursor
-        }
-      }),
-      signal: AbortSignal.timeout(25_000)
-    });
-    if (githubResponse.status === 403 || githubResponse.status === 429) throw new Error("GITHUB_RATE_LIMIT");
-    if (!githubResponse.ok) throw new Error("GITHUB_FETCH_FAILED");
-
-    const payload = await githubResponse.json() as PullRequestSearchPayload;
-    if (payload.errors?.length) throw new Error("GITHUB_FETCH_FAILED");
+    const payload = await fetchGithubPullRequestPage(user, githubToken, cursor);
     const search = payload.data?.search;
     nodes.push(...(Array.isArray(search?.nodes) ? search.nodes.filter(Boolean) : []));
     cursor = search?.pageInfo?.endCursor || null;
