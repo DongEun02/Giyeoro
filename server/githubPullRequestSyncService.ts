@@ -80,7 +80,7 @@ type PullRequestSearchPayload = {
 };
 
 const GITHUB_API_VERSION = "2022-11-28";
-const MINIMUM_STARS = 0;
+const MINIMUM_STARS = 50;
 const SYNC_TTL_MS = 24 * 60 * 60 * 1_000;
 const PAGE_SIZE = 100;
 const MAX_PAGES = 3;
@@ -178,6 +178,7 @@ export const isEligibleContributionPullRequest = (
     && repository?.isPrivate === false
     && repository?.isArchived === false
     && repository?.isDisabled === false
+    && integer(repository?.stargazerCount) >= MINIMUM_STARS
     && activeContribution
   );
 };

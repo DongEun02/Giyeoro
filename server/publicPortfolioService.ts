@@ -79,7 +79,8 @@ export const isValidPortfolioLogin = (value: string) => /^[A-Za-z0-9-]{1,39}$/.t
 export const isPublicPortfolioItem = ({ kind, status, data }: PortfolioVisibilityCandidate) => {
   if (status !== "completed") return false;
   if (kind !== "pull_request") return false;
-  return object(data).merged === true;
+  const itemData = object(data);
+  return itemData.merged === true && nonNegativeInteger(itemData.repositoryStars) >= 50;
 };
 
 const mapPortfolioItem = (row: PortfolioItemRow) => {

@@ -51,6 +51,7 @@ const groupPullRequests = (items: Record<string, WorkspaceItem>): RepositoryGrou
   const groups = new Map<string, WorkspaceItem[]>();
   Object.values(items).forEach(item => {
     if (item.kind !== "pull_request") return;
+    if (Number(item.data?.repositoryStars || 0) < 50) return;
     const group = groups.get(item.repo) || [];
     group.push(item);
     groups.set(item.repo, group);
@@ -123,7 +124,7 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
       </section>
 
       <section className="mypage-pr-sync contribution-sync" aria-labelledby="sync-title">
-        <div className="mypage-pr-sync-copy"><span>GitHub Sync</span><h2 id="sync-title">공개된 외부 프로젝트의 PR을 자동으로 모아요</h2><p>열린 PR과 병합된 PR을 가져와 저장소별로 정리합니다. 프로젝트 하나를 통째로 숨길 수도 있어요.</p></div>
+        <div className="mypage-pr-sync-copy"><span>GitHub Sync</span><h2 id="sync-title">스타 50개 이상인 프로젝트의 PR을 모아요</h2><p>공개된 외부 저장소의 열린 PR과 병합된 PR을 가져와 프로젝트별로 정리합니다. 프로젝트 하나를 통째로 숨길 수도 있어요.</p></div>
         <div className="mypage-pr-sync-actions">
           <div className="mypage-pr-sync-status" aria-live="polite"><span>{pullRequestSyncLoading ? "GitHub에서 확인 중" : `최근 동기화 ${syncedAtLabel}`}</span>{pullRequestSyncedAt && !pullRequestSyncLoading ? <small>최근 PR {pullRequestScannedCount}개 확인 · 새로 저장 {pullRequestImportedCount}개{pullRequestSyncTruncated ? " · 최근 300개 기준" : ""}</small> : null}</div>
           <button type="button" onClick={onPullRequestSync} disabled={pullRequestSyncLoading}><Icons.Refresh className="w-4 h-4" />{pullRequestSyncLoading ? "동기화 중" : "지금 동기화"}</button>

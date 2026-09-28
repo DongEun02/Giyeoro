@@ -19,14 +19,14 @@ const contribution = (overrides: Record<string, unknown> = {}) => ({
   ...overrides
 });
 
-test("공개된 외부 저장소의 작성 PR을 허용한다", () => {
+test("스타 50개 이상인 공개 외부 저장소의 작성 PR을 허용한다", () => {
   assert.equal(isEligibleContributionPullRequest(contribution(), "contributor"), true);
 });
 
-test("별 개수와 라이선스 유무로 기여를 누락하지 않는다", () => {
+test("스타 50개 미만은 제외하고 라이선스 유무는 제한하지 않는다", () => {
   assert.equal(isEligibleContributionPullRequest(contribution({
-    repository: { ...contribution().repository, stargazerCount: 99 }
-  }), "contributor"), true);
+    repository: { ...contribution().repository, stargazerCount: 49 }
+  }), "contributor"), false);
   assert.equal(isEligibleContributionPullRequest(contribution({
     repository: { ...contribution().repository, licenseInfo: null }
   }), "contributor"), true);

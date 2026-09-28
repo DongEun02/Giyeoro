@@ -21,7 +21,7 @@ test("GitHub에서 병합된 완료 PR만 공개한다", () => {
   assert.equal(isPublicPortfolioItem({
     kind: "pull_request",
     status: "completed",
-    data: { merged: true }
+    data: { merged: true, repositoryStars: 50 }
   }), true);
   assert.equal(isPublicPortfolioItem({
     kind: "pull_request",
@@ -31,7 +31,15 @@ test("GitHub에서 병합된 완료 PR만 공개한다", () => {
   assert.equal(isPublicPortfolioItem({
     kind: "pull_request",
     status: "in_progress",
-    data: { merged: true }
+    data: { merged: true, repositoryStars: 50 }
+  }), false);
+});
+
+test("스타 50개 미만 저장소의 PR은 공개하지 않는다", () => {
+  assert.equal(isPublicPortfolioItem({
+    kind: "pull_request",
+    status: "completed",
+    data: { merged: true, repositoryStars: 49 }
   }), false);
 });
 
