@@ -72,6 +72,12 @@ export const deleteRemoteWorkspaceItem = async (id: string) => {
   }, "작업을 삭제하지 못했습니다.");
 };
 
+export const hideRemoteRepository = async (repo: string) => {
+  await request<{ ok: true }>(`/api/workspace?repo=${encodeURIComponent(repo)}`, {
+    method: "DELETE"
+  }, "프로젝트를 공개 목록에서 숨기지 못했습니다.");
+};
+
 export const syncRemoteGithubPullRequests = async (
   force = false,
   signal?: AbortSignal
@@ -86,4 +92,11 @@ export const restoreIgnoredPullRequest = async (id: string) => {
     method: "PATCH",
     body: JSON.stringify({ id })
   }, "제외한 PR을 복구하지 못했습니다.");
+};
+
+export const restoreIgnoredRepository = async (repo: string) => {
+  await request<{ ok: true }>("/api/workspace?operation=sync-pull-requests", {
+    method: "PATCH",
+    body: JSON.stringify({ repo })
+  }, "프로젝트를 다시 가져오지 못했습니다.");
 };

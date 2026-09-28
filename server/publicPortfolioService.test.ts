@@ -12,8 +12,8 @@ test("공개 포트폴리오 GitHub 사용자 이름을 검증한다", () => {
   assert.equal(isValidPortfolioLogin(""), false);
 });
 
-test("완료 처리한 이슈만 공개한다", () => {
-  assert.equal(isPublicPortfolioItem({ kind: "issue", status: "completed", data: {} }), true);
+test("이슈는 완료 상태여도 공개하지 않는다", () => {
+  assert.equal(isPublicPortfolioItem({ kind: "issue", status: "completed", data: {} }), false);
   assert.equal(isPublicPortfolioItem({ kind: "issue", status: "in_progress", data: {} }), false);
 });
 

@@ -78,7 +78,6 @@ export const isValidPortfolioLogin = (value: string) => /^[A-Za-z0-9-]{1,39}$/.t
 
 export const isPublicPortfolioItem = ({ kind, status, data }: PortfolioVisibilityCandidate) => {
   if (status !== "completed") return false;
-  if (kind === "issue") return true;
   if (kind !== "pull_request") return false;
   return object(data).merged === true;
 };
@@ -159,14 +158,9 @@ export const handlePublicPortfolioRequest = async (
         language_tags, url, data, updated_at
       FROM workspace_items
       WHERE user_id = ${user.github_id}
-        AND (
-          (kind = 'issue' AND status = 'completed')
-          OR (
-            kind = 'pull_request'
-            AND status = 'completed'
-            AND COALESCE(data ->> 'merged', 'false') = 'true'
-          )
-        )
+        AND kind = 'pull_request'
+        AND status = 'completed'
+        AND COALESCE(data ->> 'merged', 'false') = 'true'
       ORDER BY updated_at DESC
     `);
 

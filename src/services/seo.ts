@@ -7,8 +7,8 @@ type SeoConfig = {
 };
 
 const DEFAULT_SEO: SeoConfig = {
-  title: "기여로 | 첫 오픈소스 기여 찾기",
-  description: "오픈소스에 처음 참여하는 사람을 위해 맞춤 프로젝트와 기여하기 좋은 이슈를 추천하고, 기여 준비부터 진행 상태까지 관리하는 서비스입니다.",
+  title: "기여로 | 오픈소스 기여 PR 포트폴리오",
+  description: "GitHub에 흩어진 오픈소스 Pull Request를 프로젝트별로 모아 하나의 포트폴리오 링크로 공유하세요.",
   canonicalPath: "/"
 };
 
@@ -39,8 +39,8 @@ function getSeoConfig(pathname: string): SeoConfig {
 
   if (pathname.startsWith("/mypage")) {
     return {
-      title: "마이페이지 | 기여로",
-      description: "관심 있는 오픈소스 작업과 기여 진행 상태를 한곳에서 관리하세요.",
+      title: "내 오픈소스 기여 | 기여로",
+      description: "GitHub Pull Request를 프로젝트별로 모으고 공개할 기여를 관리하세요.",
       canonicalPath: "/mypage"
     };
   }
@@ -48,7 +48,7 @@ function getSeoConfig(pathname: string): SeoConfig {
   if (pathname.startsWith("/portfolio")) {
     return {
       title: "오픈소스 기여 포트폴리오 | 기여로",
-      description: "기여로에서 완료한 오픈소스 이슈와 GitHub에 병합된 Pull Request를 확인하세요.",
+      description: "GitHub에서 병합된 오픈소스 Pull Request를 프로젝트별로 확인하세요.",
       canonicalPath: pathname
     };
   }

@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { MyPage } from "../components/MyPage";
 import { MyPageLoginGate } from "../components/MyPageLoginGate";
 import { useOssApp } from "../app/OssAppContext";
-import type { WorkspaceItem } from "../services/userWorkspace";
 import type { IgnoredPullRequest, PullRequestSyncResult } from "../services/workspace";
+import { hideRemoteRepository, restoreIgnoredRepository } from "../services/workspace";
 
 const EMPTY_SYNC_RESULT = {
   syncedAt: "",
@@ -21,7 +21,7 @@ export function WorkspacePage() {
   const [pullRequestSyncLoading, setPullRequestSyncLoading] = useState(false);
   const [pullRequestSyncError, setPullRequestSyncError] = useState("");
   const [pullRequestSyncResult, setPullRequestSyncResult] = useState(() => EMPTY_SYNC_RESULT);
-  const [restoringPullRequestId, setRestoringPullRequestId] = useState("");
+  const [updatingRepository, setUpdatingRepository] = useState("");
   const [portfolioCopied, setPortfolioCopied] = useState(false);
   const {
     authUser,
@@ -29,12 +29,7 @@ export function WorkspacePage() {
     workspaceLoading,
     workspaceError,
     trackedTasks,
-    myPageStatus,
-    setMyPageStatus,
-    updateWorkspaceStatus,
-    removeWorkspaceItem,
     syncGithubPullRequests,
-    restoreGithubPullRequest,
     openWorkspaceItem,
     triggerToast
   } = useOssApp();
@@ -106,42 +101,39 @@ export function WorkspacePage() {
     return () => controller.abort();
   }, [authLoading, authUser?.login, workspaceLoading, runPullRequestSync]);
 
-  const handleRemove = async (item: WorkspaceItem) => {
-    try {
-      await removeWorkspaceItem(item);
-      if (item.kind !== "pull_request") return;
-      setPullRequestSyncResult(current => ({
-        ...current,
-        ignoredItems: [
-          {
-            id: item.id,
-            repo: item.repo,
-            title: item.title,
-            url: item.url || "",
-            ignoredAt: new Date().toISOString()
-          },
-          ...current.ignoredItems.filter(ignored => ignored.id !== item.id)
-        ]
-      }));
-    } catch {
-      // App context restores the optimistic item and shows the server error.
-    }
-  };
-
-  const handleRestorePullRequest = async (item: IgnoredPullRequest) => {
-    if (restoringPullRequestId) return;
-    setRestoringPullRequestId(item.id);
+  const handleHideRepository = async (repo: string) => {
+    if (updatingRepository) return;
+    setUpdatingRepository(repo);
     setPullRequestSyncError("");
     try {
-      const result = await restoreGithubPullRequest(item.id) as PullRequestSyncResult;
+      await hideRemoteRepository(repo);
+      const result = await syncGithubPullRequests(false) as PullRequestSyncResult;
       applySyncResult(result);
-      triggerToast(`'${item.title}' PR을 다시 가져왔습니다.`);
+      triggerToast(`'${repo}' 프로젝트를 공개 목록에서 숨겼습니다.`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "제외한 PR을 복구하지 못했습니다.";
+      const message = error instanceof Error ? error.message : "프로젝트를 숨기지 못했습니다.";
       setPullRequestSyncError(message);
       triggerToast(message);
     } finally {
-      setRestoringPullRequestId("");
+      setUpdatingRepository("");
+    }
+  };
+
+  const handleRestoreRepository = async (repo: string) => {
+    if (updatingRepository) return;
+    setUpdatingRepository(repo);
+    setPullRequestSyncError("");
+    try {
+      await restoreIgnoredRepository(repo);
+      const result = await syncGithubPullRequests(true) as PullRequestSyncResult;
+      applySyncResult(result);
+      triggerToast(`'${repo}' 프로젝트를 다시 공개 목록에 추가했습니다.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "프로젝트를 복구하지 못했습니다.";
+      setPullRequestSyncError(message);
+      triggerToast(message);
+    } finally {
+      setUpdatingRepository("");
     }
   };
 
@@ -174,12 +166,7 @@ export function WorkspacePage() {
       <MyPage
         user={authUser}
         items={trackedTasks}
-        activeStatus={myPageStatus}
-        onActiveStatusChange={setMyPageStatus}
-        onStatusChange={updateWorkspaceStatus}
-        onRemove={handleRemove}
         onOpen={openWorkspaceItem}
-        onBrowse={() => navigate("/issues")}
         onOpenPortfolio={() => navigate(portfolioPath)}
         onSharePortfolio={handlePortfolioShare}
         portfolioCopied={portfolioCopied}
@@ -188,12 +175,12 @@ export function WorkspacePage() {
         pullRequestSyncedAt={pullRequestSyncResult.syncedAt}
         pullRequestImportedCount={pullRequestSyncResult.importedCount}
         pullRequestScannedCount={pullRequestSyncResult.scannedCount}
-        pullRequestMinimumStars={pullRequestSyncResult.minimumStars}
         pullRequestSyncTruncated={pullRequestSyncResult.truncated}
         ignoredPullRequests={pullRequestSyncResult.ignoredItems}
-        restoringPullRequestId={restoringPullRequestId}
         onPullRequestSync={() => runPullRequestSync(true, true)}
-        onRestorePullRequest={handleRestorePullRequest}
+        updatingRepository={updatingRepository}
+        onHideRepository={handleHideRepository}
+        onRestoreRepository={handleRestoreRepository}
       />
     </>
   );

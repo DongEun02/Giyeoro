@@ -2,6 +2,55 @@
   box-sizing: border-box;
 }
 
+/* Focused contribution portfolio */
+.contribution-landing { min-height: 100vh; background: #f7f8f5; color: #17201c; }
+.contribution-landing-nav { width: min(1120px, calc(100% - 40px)); height: 72px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+.contribution-landing-nav button { border: 0; background: transparent; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; color: inherit; }
+.contribution-landing-nav button:first-child svg { width: 28px; height: 28px; }
+.contribution-landing-nav button:last-child { padding: 10px 16px; border: 1px solid #d7ddd8; border-radius: 10px; background: #fff; font-weight: 700; }
+.contribution-landing main { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+.contribution-landing-hero { text-align: center; padding: 96px 20px 70px; }
+.contribution-landing-hero > span, .contribution-preview-header span { color: #32805b; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.contribution-landing-hero h1 { margin: 18px 0 24px; font-size: clamp(44px, 7vw, 76px); line-height: 1.08; letter-spacing: -.055em; }
+.contribution-landing-hero h1 strong { color: #32805b; }
+.contribution-landing-hero p { color: #667069; font-size: 18px; line-height: 1.75; }
+.contribution-landing-hero > button { margin-top: 34px; border: 0; border-radius: 12px; padding: 15px 24px; background: #17201c; color: #fff; display: inline-flex; align-items: center; gap: 10px; font-weight: 800; cursor: pointer; }
+.contribution-landing-hero small { display: block; margin-top: 15px; color: #89918c; }
+.contribution-landing-preview { max-width: 860px; margin: 0 auto 90px; padding: 28px; background: #fff; border: 1px solid #e0e5e1; border-radius: 20px; box-shadow: 0 24px 70px rgba(30, 50, 40, .08); }
+.contribution-preview-header { display: flex; align-items: end; justify-content: space-between; padding-bottom: 22px; border-bottom: 1px solid #edf0ed; }
+.contribution-preview-header h2 { margin: 4px 0 0; font-size: 24px; }
+.contribution-preview-list article { display: grid; grid-template-columns: 44px 1fr auto 20px; gap: 15px; align-items: center; padding: 20px 4px; border-bottom: 1px solid #edf0ed; }
+.contribution-preview-list article:last-child { border-bottom: 0; }
+.contribution-preview-icon { width: 44px; height: 44px; border-radius: 12px; background: #edf6f1; color: #32805b; display: grid; place-items: center; }
+.contribution-preview-list h3 { margin: 3px 0; font-size: 16px; }.contribution-preview-list span,.contribution-preview-list p { color: #7a837e; font-size: 12px; }.contribution-preview-list article > strong { color: #32805b; }
+.contribution-landing footer { text-align: center; color: #8a928d; padding: 28px; border-top: 1px solid #e2e6e3; font-size: 13px; }
+
+.contribution-dashboard { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding-bottom: 80px; }
+.contribution-heading { padding-top: 64px; }
+.contribution-summary { margin: 28px 0 18px; padding: 22px 24px; border: 1px solid #e2e7e3; border-radius: 16px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 28px; background: #fff; }
+.contribution-summary-stats { display: flex; gap: 28px; }.contribution-summary-stats div { display: flex; flex-direction: column; align-items: center; }.contribution-summary-stats strong { font-size: 22px; }.contribution-summary-stats span { color: #7b847f; font-size: 12px; }
+.contribution-sync { margin-bottom: 42px; }
+.contribution-section-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 18px; }.contribution-section-heading span { color: #32805b; font-size: 11px; font-weight: 800; letter-spacing: .1em; }.contribution-section-heading h2 { margin: 4px 0 0; font-size: 24px; }.contribution-section-heading > button { border: 0; background: transparent; display: flex; align-items: center; gap: 6px; color: #496057; cursor: pointer; font-weight: 700; }
+.contribution-project-list,.portfolio-project-list { display: grid; gap: 16px; }
+.contribution-project-card,.portfolio-project-card { background: #fff; border: 1px solid #e0e5e1; border-radius: 16px; overflow: hidden; }
+.contribution-project-card > header,.portfolio-project-card > header { display: grid; grid-template-columns: 52px minmax(0,1fr) auto auto; align-items: center; gap: 16px; padding: 22px 24px; }
+.contribution-project-card header > img,.portfolio-project-card header > img { width: 52px; height: 52px; border-radius: 13px; object-fit: cover; border: 1px solid #e4e8e5; }
+.contribution-project-title span,.portfolio-project-card header > div > span { color: #32805b; font-size: 11px; font-weight: 750; }.contribution-project-title h3,.portfolio-project-card h3 { margin: 3px 0 5px; font-size: 18px; }.contribution-project-title p,.portfolio-project-card header p { color: #7a837e; font-size: 12px; margin: 0; }
+.contribution-project-diff,.portfolio-project-diff { display: flex; gap: 8px; font-size: 13px; }.contribution-project-diff strong,.portfolio-project-diff strong { color: #1f883d; }.contribution-project-diff span,.portfolio-project-diff span { color: #cf222e; }
+.contribution-hide-button { border: 1px solid #e1e5e2; background: #fff; color: #68716c; padding: 8px 11px; border-radius: 8px; cursor: pointer; font-size: 12px; }.contribution-hide-button:hover { color: #b42318; border-color: #f1b9b4; }
+.contribution-pr-list,.portfolio-project-prs { border-top: 1px solid #edf0ed; }.contribution-pr-row,.portfolio-project-prs a { width: 100%; display: grid; grid-template-columns: 64px minmax(0,1fr) auto 18px; gap: 12px; align-items: center; padding: 13px 24px; border: 0; border-bottom: 1px solid #f0f2f0; background: #fff; text-align: left; color: inherit; text-decoration: none; cursor: pointer; }.contribution-pr-row:hover,.portfolio-project-prs a:hover { background: #f8faf8; }.contribution-pr-row > span,.portfolio-project-prs a > span { font-size: 11px; font-weight: 800; }.contribution-pr-row .is-merged,.portfolio-project-prs a > span { color: #8250df; }.contribution-pr-row .is-open { color: #1a7f37; }.contribution-pr-row strong,.portfolio-project-prs a strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }.contribution-pr-row small,.portfolio-project-prs a small { color: #858d88; }
+.contribution-expand-button,.portfolio-project-card > button { width: 100%; border: 0; background: #fafbfa; padding: 11px; color: #52645b; font-weight: 700; cursor: pointer; }
+.contribution-hidden-projects { margin-top: 26px; padding: 18px 20px; border: 1px solid #e1e5e2; border-radius: 14px; background: #fff; }.contribution-hidden-projects summary { cursor: pointer; font-weight: 800; }.contribution-hidden-projects ul { list-style: none; padding: 12px 0 0; margin: 0; }.contribution-hidden-projects li { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid #eef0ee; }.contribution-hidden-projects li div { display: flex; flex-direction: column; }.contribution-hidden-projects li span { color: #818984; font-size: 12px; }.contribution-hidden-projects li button { border: 1px solid #d8ded9; background: #fff; border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+.portfolio-project-card > header { grid-template-columns: 52px minmax(0,1fr) auto; }.portfolio-project-page .portfolio-contributions { margin-top: 46px; }
+
+@media (max-width: 720px) {
+  .contribution-landing-hero { padding-top: 64px; }.contribution-landing-hero p br { display: none; }.contribution-landing-preview { padding: 18px; }.contribution-preview-header > strong { display: none; }
+  .contribution-summary { grid-template-columns: 1fr; }.contribution-summary-stats { justify-content: space-between; }.contribution-summary > button { width: 100%; justify-content: center; }
+  .contribution-project-card > header,.portfolio-project-card > header { grid-template-columns: 44px minmax(0,1fr); padding: 18px; }.contribution-project-card header > img,.portfolio-project-card header > img { width: 44px; height: 44px; }.contribution-project-diff,.contribution-hide-button,.portfolio-project-diff { grid-column: 2; }.contribution-hide-button { justify-self: start; }
+  .contribution-pr-row,.portfolio-project-prs a { grid-template-columns: 58px minmax(0,1fr) 16px; padding: 13px 18px; }.contribution-pr-row small,.portfolio-project-prs a small { display: none; }
+  .contribution-section-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+}
+
 /* Full-screen product entrance */
 .app-root.app-root-landing {
   min-height: 100dvh;

@@ -1,79 +1,35 @@
 import { useNavigate } from "react-router-dom";
 import { BrandMark } from "../components/BrandMark";
 import { Icons } from "../components/Icons";
-import { getRepoVisual } from "../data/content";
-import { CONTRIBUTION_CATEGORIES } from "../../shared/contributionCategories";
 
-const LANDING_PREVIEW_ISSUES = CONTRIBUTION_CATEGORIES.flatMap(category => (
-  category.repositoryNames.slice(0, 2).map(repo => ({
-    repo,
-    stage: category.stageLabel,
-    title: category.description,
-    badge: category.title
-  }))
-));
-
-const LANDING_PREVIEW_LANES = [
-  LANDING_PREVIEW_ISSUES.filter((_, index) => index % 2 === 0),
-  LANDING_PREVIEW_ISSUES.filter((_, index) => index % 2 === 1)
+const SAMPLE_PROJECTS = [
+  { repo: "vercel/next.js", count: 18, additions: "2,840", language: "TypeScript" },
+  { repo: "facebook/react", count: 7, additions: "1,120", language: "JavaScript" },
+  { repo: "rust-lang/rust", count: 4, additions: "680", language: "Rust" }
 ];
 
 export function LandingPage() {
   const navigate = useNavigate();
-
   return (
-    <div className="landing-home landing-home-minimal animate-fade-in">
-      <section className="landing-intro">
-        <button type="button" className="landing-intro-brand" onClick={() => navigate("/")} aria-label="기여로 홈">
-          <span><BrandMark /></span>
-          <strong>기여로</strong>
-        </button>
-
-        <div className="landing-intro-glow" aria-hidden="true" />
-
-        <div className="landing-intro-content">
-          <h1>
-            <span>기여로에서</span>
-            <span><strong className="landing-intro-highlight">첫 오픈소스 기여</strong>를</span>
-            <span>시작하세요</span>
-          </h1>
-          <p className="landing-intro-copy">
-            문서 번역부터 기능 추가까지, 내게 맞는 첫 기여를 단계별로 찾을 수 있습니다.<br />
-            추천 작업을 고르고 프로젝트별 기여 규칙까지 한곳에서 확인하세요.
-          </p>
-          <div className="landing-intro-actions">
-            <button type="button" className="landing-intro-primary" onClick={() => navigate("/issues")}>
-              첫 기여 찾아보기 <Icons.ArrowRight className="w-4 h-4" />
-            </button>
-            <button type="button" className="landing-intro-secondary" onClick={() => navigate("/about")}>
-              기여로 알아보기
-            </button>
-          </div>
-        </div>
-
-        <div className="landing-issue-marquee" aria-hidden="true">
-          {LANDING_PREVIEW_LANES.map((lane, laneIndex) => (
-            <div className="landing-issue-marquee-lane" key={laneIndex}>
-              <div className="landing-issue-marquee-track">
-                {[0, 1].map(groupIndex => (
-                  <div className="landing-issue-marquee-group" key={groupIndex}>
-                    {lane.map(issue => (
-                      <div className="landing-issue-marquee-card" key={`${groupIndex}-${issue.repo}`}>
-                        <img src={getRepoVisual(issue.repo).image} alt="" />
-                        <div>
-                          <span>{issue.repo} · {issue.stage}</span>
-                          <strong>{issue.title}</strong>
-                        </div>
-                        <em>{issue.badge}</em>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+    <div className="contribution-landing animate-fade-in">
+      <header className="contribution-landing-nav">
+        <button type="button" onClick={() => navigate("/")} aria-label="기여로 홈"><BrandMark /><strong>기여로</strong></button>
+        <button type="button" onClick={() => navigate("/mypage")}>내 기여 모으기 <Icons.ArrowRight className="w-4 h-4" /></button>
+      </header>
+      <main>
+        <section className="contribution-landing-hero">
+          <span>GitHub Contribution Portfolio</span>
+          <h1>흩어진 오픈소스 기여를<br /><strong>하나의 링크로.</strong></h1>
+          <p>내가 만든 Pull Request를 자동으로 모아 프로젝트별로 정리하고,<br />보여주고 싶은 기여만 골라 간편하게 공유하세요.</p>
+          <button type="button" onClick={() => navigate("/mypage")}><Icons.Github className="w-5 h-5" />GitHub로 시작하기</button>
+          <small>공개 저장소의 PR만 사용하며 비공개 저장소 권한은 요청하지 않습니다.</small>
+        </section>
+        <section className="contribution-landing-preview" aria-label="프로젝트별 기여 포트폴리오 예시">
+          <div className="contribution-preview-header"><div><span>Open Source Contributions</span><h2>프로젝트별 기여</h2></div><strong>29 Merged PRs</strong></div>
+          <div className="contribution-preview-list">{SAMPLE_PROJECTS.map(project => <article key={project.repo}><div className="contribution-preview-icon"><Icons.GitPullRequest className="w-5 h-5" /></div><div><span>{project.language}</span><h3>{project.repo}</h3><p>병합된 Pull Request {project.count}개</p></div><strong>+{project.additions}</strong><Icons.ArrowRight className="w-4 h-4" /></article>)}</div>
+        </section>
+      </main>
+      <footer>© 2026 기여로 · 오픈소스 기여를 기록하는 가장 간단한 방법</footer>
     </div>
   );
 }

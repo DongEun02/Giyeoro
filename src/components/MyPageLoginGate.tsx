@@ -22,14 +22,14 @@ export function MyPageLoginGate({ loading }: MyPageLoginGateProps) {
     <section className="mypage-login-gate animate-fade-in" aria-labelledby="mypage-login-heading">
       <span className="mypage-login-icon"><Icons.Github className="w-7 h-7" /></span>
       <div>
-        <span>로그인 전용 공간</span>
-        <h1 id="mypage-login-heading">마이페이지는 GitHub 로그인 후 이용할 수 있어요</h1>
-        <p>관심 있는 이슈와 기여 진행 상태를 확인하려면 GitHub 계정으로 로그인해 주세요. 비공개 저장소 권한은 요청하지 않습니다.</p>
+        <span>내 기여 포트폴리오</span>
+        <h1 id="mypage-login-heading">GitHub에 흩어진 PR을 한곳에 모아보세요</h1>
+        <p>로그인하면 공개된 외부 프로젝트의 PR을 자동으로 가져와 프로젝트별로 정리합니다. 비공개 저장소 권한은 요청하지 않습니다.</p>
       </div>
       <a href={getGithubLoginUrl("/mypage")} className="mypage-login-button">
         <Icons.Github className="w-4 h-4" /> GitHub로 로그인
       </a>
-      <small>로그인하면 관심 이슈와 진행 상태가 계정에 안전하게 저장되어 다른 기기에서도 이어집니다.</small>
+      <small>병합된 PR만 공개 페이지에 표시되며, 원하지 않는 프로젝트는 언제든 숨길 수 있습니다.</small>
     </section>
   );
 }

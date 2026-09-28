@@ -80,11 +80,10 @@ type PullRequestSearchPayload = {
 };
 
 const GITHUB_API_VERSION = "2022-11-28";
-const MINIMUM_STARS = 100;
+const MINIMUM_STARS = 0;
 const SYNC_TTL_MS = 24 * 60 * 60 * 1_000;
 const PAGE_SIZE = 100;
 const MAX_PAGES = 3;
-const EXCLUDED_LICENSES = new Set(["", "NOASSERTION", "OTHER"]);
 
 const PULL_REQUEST_SEARCH_QUERY = `
   query AuthoredPullRequests($query: String!, $first: Int!, $after: String) {
@@ -167,7 +166,6 @@ export const isEligibleContributionPullRequest = (
   githubLogin: string
 ) => {
   const repository = pullRequest.repository;
-  const licenseId = text(repository?.licenseInfo?.spdxId, 100).toUpperCase();
   const authorLogin = text(pullRequest.author?.login, 100).toLowerCase();
   const ownerLogin = text(repository?.owner?.login, 100).toLowerCase();
   const login = githubLogin.toLowerCase();
@@ -180,8 +178,6 @@ export const isEligibleContributionPullRequest = (
     && repository?.isPrivate === false
     && repository?.isArchived === false
     && repository?.isDisabled === false
-    && integer(repository?.stargazerCount) >= MINIMUM_STARS
-    && !EXCLUDED_LICENSES.has(licenseId)
     && activeContribution
   );
 };
@@ -344,11 +340,19 @@ export const handleGithubPullRequestSyncRequest = async (
           request.on("error", reject);
         });
       const id = text(body.id, 300);
-      if (!id) return jsonResponse(response, 400, { error: "복구할 PR이 올바르지 않습니다." });
-      await database.execute(sql`
-        DELETE FROM workspace_ignored_items
-        WHERE user_id = ${user.id} AND item_id = ${id} AND kind = 'pull_request'
-      `);
+      const repo = text(body.repo, 300);
+      if (!id && !repo) return jsonResponse(response, 400, { error: "복구할 PR 또는 프로젝트가 올바르지 않습니다." });
+      if (repo) {
+        await database.execute(sql`
+          DELETE FROM workspace_ignored_items
+          WHERE user_id = ${user.id} AND LOWER(repo) = LOWER(${repo}) AND kind = 'pull_request'
+        `);
+      } else {
+        await database.execute(sql`
+          DELETE FROM workspace_ignored_items
+          WHERE user_id = ${user.id} AND item_id = ${id} AND kind = 'pull_request'
+        `);
+      }
       return jsonResponse(response, 200, { ok: true });
     }
 
@@ -386,8 +390,8 @@ export const handleGithubPullRequestSyncRequest = async (
 
     const [{ nodes, truncated }, ignoredResult, existingResult] = await Promise.all([
       fetchAuthoredPullRequests(user, githubToken),
-      database.execute<{ item_id: string }>(sql`
-        SELECT item_id FROM workspace_ignored_items
+      database.execute<{ item_id: string; repo: string }>(sql`
+        SELECT item_id, repo FROM workspace_ignored_items
         WHERE user_id = ${user.id} AND kind = 'pull_request'
       `),
       database.execute<ExistingItemRow>(sql`
@@ -396,11 +400,12 @@ export const handleGithubPullRequestSyncRequest = async (
       `)
     ]);
     const ignoredIds = new Set(ignoredResult.rows.map(row => row.item_id));
+    const ignoredRepositories = new Set(ignoredResult.rows.map(row => row.repo.toLowerCase()));
     const existingIds = new Set(existingResult.rows.map(row => row.item_id));
     const eligibleItems = nodes
       .filter(node => isEligibleContributionPullRequest(node, user.login))
       .map(mapPullRequestItem)
-      .filter(item => !ignoredIds.has(item.id));
+      .filter(item => !ignoredIds.has(item.id) && !ignoredRepositories.has(item.repo.toLowerCase()));
     const importedCount = eligibleItems.filter(item => !existingIds.has(item.id)).length;
 
     for (let index = 0; index < eligibleItems.length; index += 10) {

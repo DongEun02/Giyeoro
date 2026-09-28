@@ -274,7 +274,22 @@ export const handleWorkspaceRequest = async (
     if (request.method === "DELETE") {
       const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
       const id = text(requestUrl.searchParams.get("id"), 300);
-      if (!id) return jsonResponse(response, 400, { error: "삭제할 작업 ID가 필요합니다." });
+      const repo = text(requestUrl.searchParams.get("repo"), 300);
+      if (!id && !repo) return jsonResponse(response, 400, { error: "숨길 PR 또는 프로젝트가 필요합니다." });
+      if (repo) {
+        await database.execute(sql`
+          WITH removed AS (
+            DELETE FROM workspace_items
+            WHERE user_id = ${user.id} AND LOWER(repo) = LOWER(${repo}) AND kind = 'pull_request'
+            RETURNING item_id, kind, repo, title, url
+          )
+          INSERT INTO workspace_ignored_items (user_id, item_id, kind, repo, title, url)
+          SELECT ${user.id}, item_id, kind, repo, title, url FROM removed
+          ON CONFLICT (user_id, item_id) DO UPDATE SET
+            repo = EXCLUDED.repo, title = EXCLUDED.title, url = EXCLUDED.url, ignored_at = NOW()
+        `);
+        return jsonResponse(response, 200, { ok: true });
+      }
       await database.execute(sql`
         WITH removed AS (
           DELETE FROM workspace_items
