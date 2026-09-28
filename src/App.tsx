@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { OssAppProvider } from "./app/OssAppContext";
 import { BrandMark, SITE_ICON_DATA_URL } from "./components/BrandMark";
 import { GitHubAuthControl } from "./components/GitHubAuthControl";
@@ -174,6 +175,7 @@ export default function App() {
 
         {view === "mypage" || view === "privacy" ? <footer className="app-footer"><div className="app-footer-inner"><div className="app-footer-top"><div className="app-footer-brand"><span className="brand-mark"><BrandMark /></span><strong>기여로</strong></div><div className="app-footer-links"><Link to="/mypage">내 기여</Link><Link to="/privacy">개인정보 처리방침</Link><a href="mailto:imde0205@gmail.com">문의하기</a></div></div><p>오픈소스 기여를 기록하는 가장 간단한 방법. © 2026 기여로</p></div></footer> : null}
       </div>
+      <Analytics />
     </OssAppProvider>
   );
 }
