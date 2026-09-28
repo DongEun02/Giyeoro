@@ -8701,3 +8701,17 @@ body {
     width: 100%;
   }
 }
+
+/* Keep public portfolio change totals compact and immune to legacy card styles. */
+.portfolio-project-card .portfolio-project-diff {
+  gap: 8px;
+  min-width: auto;
+}
+
+.portfolio-project-card .portfolio-project-diff > .portfolio-additions {
+  color: #1a7f37 !important;
+}
+
+.portfolio-project-card .portfolio-project-diff > .portfolio-deletions {
+  color: #cf222e !important;
+}
