@@ -8715,3 +8715,18 @@ body {
 .portfolio-project-card .portfolio-project-diff > .portfolio-deletions {
   color: #cf222e !important;
 }
+
+.contribution-project-card .contribution-project-diff {
+  gap: 8px;
+  min-width: auto;
+}
+
+.contribution-project-card .contribution-project-diff > .contribution-additions {
+  color: #1a7f37 !important;
+  font-weight: 700;
+}
+
+.contribution-project-card .contribution-project-diff > .contribution-deletions {
+  color: #cf222e !important;
+  font-weight: 700;
+}
