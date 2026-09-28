@@ -7,7 +7,6 @@
 .contribution-landing-nav { width: min(1120px, calc(100% - 40px)); height: 72px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
 .contribution-landing-nav button { border: 0; background: transparent; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; color: inherit; }
 .contribution-landing-nav button:first-child svg { width: 28px; height: 28px; }
-.contribution-landing-nav button:last-child { padding: 10px 16px; border: 1px solid #d7ddd8; border-radius: 10px; background: #fff; font-weight: 700; }
 .contribution-landing main { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
 .contribution-landing-hero { text-align: center; padding: 96px 20px 70px; }
 .contribution-landing-hero > span, .contribution-preview-header span { color: #32805b; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
@@ -8832,4 +8831,19 @@ body {
 
 .privacy-contact:hover {
   text-decoration: underline;
+}
+
+.app-header > .app-header-inner > .header-login-button {
+  grid-column: 3;
+  justify-self: end;
+  width: max-content;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 780px) {
+  .app-header > .app-header-inner > .header-login-button {
+    grid-column: 2;
+    width: 34px;
+  }
 }

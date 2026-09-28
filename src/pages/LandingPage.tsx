@@ -14,7 +14,6 @@ export function LandingPage() {
     <div className="contribution-landing animate-fade-in">
       <header className="contribution-landing-nav">
         <button type="button" onClick={() => navigate("/")} aria-label="기여로 홈"><BrandMark /><strong>기여로</strong></button>
-        <button type="button" onClick={() => navigate("/mypage")}>내 기여 모으기 <Icons.ArrowRight className="w-4 h-4" /></button>
       </header>
       <main>
         <section className="contribution-landing-hero">
