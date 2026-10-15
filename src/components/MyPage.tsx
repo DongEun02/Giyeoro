@@ -106,7 +106,7 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
         <p>흩어진 GitHub PR을 프로젝트별로 모으고, 하나의 링크로 공유하세요.</p>
       </header>
 
-      <section className="contribution-summary" aria-label="기여 요약">
+      <section className="contribution-dashboard-summary" aria-label="기여 요약">
         <div className="mypage-profile">
           <a href={user.profileUrl} target="_blank" rel="noreferrer" className="mypage-profile-mark" aria-label={`${user.login} GitHub 프로필 열기`}>
             {user.avatarUrl ? <img src={user.avatarUrl} alt="" width="42" height="42" referrerPolicy="no-referrer" /> : <BrandMark />}
