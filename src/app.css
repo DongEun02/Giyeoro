@@ -2555,7 +2555,7 @@ body {
   padding: 0 !important;
 }
 
-.app-header-portfolio > .app-header-inner {
+.app-header-share > .app-header-inner {
   grid-template-columns: 1fr;
 }
 

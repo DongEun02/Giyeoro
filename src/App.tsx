@@ -24,11 +24,15 @@ import { syncRemoteGithubPullRequests, syncWorkspaceItems } from "./services/wor
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const isPortfolioPreview = location.pathname.startsWith("/portfolio");
+  const isSharedPortfolio = location.pathname.startsWith("/share");
   const view = location.pathname.startsWith("/mypage")
     ? "mypage"
-    : location.pathname.startsWith("/portfolio") || location.pathname.startsWith("/share")
+    : isPortfolioPreview
       ? "portfolio"
-      : location.pathname.startsWith("/privacy") ? "privacy" : "landing";
+      : isSharedPortfolio
+        ? "share"
+        : location.pathname.startsWith("/privacy") ? "privacy" : "landing";
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authLogoutLoading, setAuthLogoutLoading] = useState(false);
@@ -155,11 +159,11 @@ export default function App() {
       <div className={`app-root font-sans antialiased flex flex-col selection:bg-[#d5e0f8] selection:text-[#18201d] ${view === "landing" ? "app-root-landing" : ""}`}>
         {toast ? <div className="fixed bottom-6 right-6 z-50 bg-[#1f2933] text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 border border-[#30363d] text-sm animate-fade-in"><Icons.Check className="text-[#3fb950] w-4 h-4" /><span>{toast}</span></div> : null}
 
-        {view !== "landing" ? <header className={`app-header ${view === "portfolio" ? "app-header-portfolio" : ""}`}>
+        {view !== "landing" ? <header className={`app-header ${view === "share" ? "app-header-share" : ""}`}>
           <div className="app-header-inner max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
             <button type="button" className="app-brand flex items-center gap-3" onClick={() => navigate("/")}><span className="brand-mark"><BrandMark /></span><span className="brand-name font-bold text-[#1f2933] text-sm tracking-tight">기여로</span></button>
-            {view === "mypage" && authUser ? <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴"><button type="button" onClick={() => navigate("/mypage")} className="nav-button nav-button-active text-xs px-3 py-1.5">내 기여</button><button type="button" onClick={() => navigate(`/portfolio/${encodeURIComponent(authUser.login)}`)} className="nav-button text-xs px-3 py-1.5">공개 페이지</button></nav> : null}
-            {view === "mypage" ? <GitHubAuthControl user={authUser} loading={authLoading} loggingOut={authLogoutLoading} loginHref={getGithubLoginUrl(`${location.pathname}${location.search}${location.hash}`)} onLogin={() => trackAnalyticsEvent("login", { method: "github" })} onLogout={handleGithubLogout} /> : null}
+            {(view === "mypage" || view === "portfolio") && authUser ? <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴"><button type="button" onClick={() => navigate("/mypage")} className={`nav-button text-xs px-3 py-1.5 ${view === "mypage" ? "nav-button-active" : ""}`}>내 기여</button><button type="button" onClick={() => navigate(`/portfolio/${encodeURIComponent(authUser.login)}`)} className={`nav-button text-xs px-3 py-1.5 ${view === "portfolio" ? "nav-button-active" : ""}`}>공개 페이지</button></nav> : null}
+            {view === "mypage" || view === "portfolio" ? <GitHubAuthControl user={authUser} loading={authLoading} loggingOut={authLogoutLoading} loginHref={getGithubLoginUrl(`${location.pathname}${location.search}${location.hash}`)} onLogin={() => trackAnalyticsEvent("login", { method: "github" })} onLogout={handleGithubLogout} /> : null}
           </div>
         </header> : null}
 
