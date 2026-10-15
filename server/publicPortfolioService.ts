@@ -1,7 +1,11 @@
+import { randomBytes } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { getDatabase } from "./database.js";
+import type { Database } from "./database.js";
+import { readGithubSessionUser } from "./githubAuthService.js";
+import type { GithubAuthOptions, GithubUser } from "./githubAuthService.js";
 
-type PublicPortfolioOptions = {
+type PublicPortfolioOptions = GithubAuthOptions & {
   databaseUrl?: string;
 };
 
@@ -28,12 +32,31 @@ type PortfolioItemRow = {
   updated_at: Date | string;
 };
 
+type PortfolioSnapshotRow = {
+  snapshot: unknown;
+};
+
+type PublicPortfolio = {
+  profile: {
+    login: string;
+    name: string;
+    avatarUrl: string;
+    profileUrl: string;
+  };
+  items: ReturnType<typeof mapPortfolioItem>[];
+};
+
 export type PortfolioVisibilityCandidate = Pick<PortfolioItemRow, "kind" | "status" | "data">;
 
-const jsonResponse = (response: any, status: number, body: unknown) => {
+const jsonResponse = (
+  response: any,
+  status: number,
+  body: unknown,
+  cacheControl = "public, max-age=0, s-maxage=60, stale-while-revalidate=300"
+) => {
   response.statusCode = status;
   response.setHeader("Content-Type", "application/json; charset=utf-8");
-  response.setHeader("Cache-Control", "public, max-age=0, s-maxage=60, stale-while-revalidate=300");
+  response.setHeader("Cache-Control", cacheControl);
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.end(JSON.stringify(body));
 };
@@ -75,6 +98,7 @@ const safeHttpsUrl = (value: unknown, allowedHost?: string) => {
 };
 
 export const isValidPortfolioLogin = (value: string) => /^[A-Za-z0-9-]{1,39}$/.test(value);
+export const isValidPortfolioSnapshotId = (value: string) => /^[A-Za-z0-9_-]{24}$/.test(value);
 
 export const isPublicPortfolioItem = ({ kind, status, data }: PortfolioVisibilityCandidate) => {
   if (status !== "completed") return false;
@@ -119,6 +143,46 @@ const resolveDatabaseUrl = (options: PublicPortfolioOptions) => (
   options.databaseUrl || process.env.DATABASE_URL || ""
 ).trim();
 
+const listPublicPortfolioItems = async (database: Database, userId: number | string) => {
+  const itemResult = await database.execute<PortfolioItemRow>(sql`
+    SELECT item_id, kind, status, repo, title, summary, difficulty, work_type,
+      language_tags, url, data, updated_at
+    FROM workspace_items
+    WHERE user_id = ${userId}
+      AND kind = 'pull_request'
+      AND status = 'completed'
+      AND COALESCE(data ->> 'merged', 'false') = 'true'
+    ORDER BY updated_at DESC
+  `);
+
+  return itemResult.rows
+    .filter(isPublicPortfolioItem)
+    .map(mapPortfolioItem);
+};
+
+const portfolioFromUser = async (
+  database: Database,
+  user: Pick<PortfolioUserRow, "github_id" | "github_login" | "name" | "avatar_url" | "profile_url">
+): Promise<PublicPortfolio> => ({
+  profile: {
+    login: text(user.github_login, 39),
+    name: text(user.name, 200, user.github_login),
+    avatarUrl: safeHttpsUrl(user.avatar_url),
+    profileUrl: safeHttpsUrl(user.profile_url, "github.com")
+  },
+  items: await listPublicPortfolioItems(database, user.github_id)
+});
+
+const portfolioFromSessionUser = async (database: Database, user: GithubUser): Promise<PublicPortfolio> => ({
+  profile: {
+    login: text(user.login, 39),
+    name: text(user.name, 200, user.login),
+    avatarUrl: safeHttpsUrl(user.avatarUrl),
+    profileUrl: safeHttpsUrl(user.profileUrl, "github.com")
+  },
+  items: await listPublicPortfolioItems(database, user.id)
+});
+
 export const handlePublicPortfolioRequest = async (
   request: any,
   response: any,
@@ -154,32 +218,80 @@ export const handlePublicPortfolioRequest = async (
       return jsonResponse(response, 404, { error: "공개 포트폴리오를 찾지 못했습니다." });
     }
 
-    const itemResult = await database.execute<PortfolioItemRow>(sql`
-      SELECT item_id, kind, status, repo, title, summary, difficulty, work_type,
-        language_tags, url, data, updated_at
-      FROM workspace_items
-      WHERE user_id = ${user.github_id}
-        AND kind = 'pull_request'
-        AND status = 'completed'
-        AND COALESCE(data ->> 'merged', 'false') = 'true'
-      ORDER BY updated_at DESC
-    `);
-
-    const items = itemResult.rows
-      .filter(isPublicPortfolioItem)
-      .map(mapPortfolioItem);
-
-    return jsonResponse(response, 200, {
-      profile: {
-        login: text(user.github_login, 39),
-        name: text(user.name, 200, user.github_login),
-        avatarUrl: safeHttpsUrl(user.avatar_url),
-        profileUrl: safeHttpsUrl(user.profile_url, "github.com")
-      },
-      items
-    });
+    return jsonResponse(response, 200, await portfolioFromUser(database, user));
   } catch (error) {
     console.error("Public portfolio API failed", error);
     return jsonResponse(response, 500, { error: "공개 포트폴리오를 불러오지 못했습니다." });
   }
+};
+
+export const handlePublicPortfolioSnapshotRequest = async (
+  request: any,
+  response: any,
+  options: PublicPortfolioOptions = {}
+) => {
+  const databaseUrl = resolveDatabaseUrl(options);
+  if (!databaseUrl) {
+    return jsonResponse(response, 503, { error: "데이터베이스가 연결되지 않았습니다." }, "no-store");
+  }
+
+  if (request.method === "POST") {
+    const user = readGithubSessionUser(request, options);
+    if (!user) {
+      return jsonResponse(response, 401, { error: "GitHub 로그인이 필요합니다." }, "no-store");
+    }
+
+    try {
+      const database = getDatabase(databaseUrl);
+      const snapshotId = randomBytes(18).toString("base64url");
+      await database.execute(sql`
+        INSERT INTO users (github_id, github_login, name, avatar_url, profile_url)
+        VALUES (${user.id}, ${user.login}, ${user.name}, ${user.avatarUrl}, ${user.profileUrl})
+        ON CONFLICT (github_id) DO UPDATE SET
+          github_login = EXCLUDED.github_login,
+          name = EXCLUDED.name,
+          avatar_url = EXCLUDED.avatar_url,
+          profile_url = EXCLUDED.profile_url,
+          updated_at = NOW()
+      `);
+      const snapshot = await portfolioFromSessionUser(database, user);
+      await database.execute(sql`
+        INSERT INTO public_portfolio_snapshots (snapshot_id, owner_id, snapshot)
+        VALUES (${snapshotId}, ${user.id}, ${JSON.stringify(snapshot)}::jsonb)
+      `);
+      return jsonResponse(response, 201, { snapshotId }, "no-store");
+    } catch (error) {
+      console.error("Public portfolio snapshot creation failed", error);
+      return jsonResponse(response, 500, { error: "공유용 포트폴리오를 만들지 못했습니다." }, "no-store");
+    }
+  }
+
+  if (request.method === "GET") {
+    const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
+    const snapshotId = text(requestUrl.searchParams.get("id"), 24);
+    if (!isValidPortfolioSnapshotId(snapshotId)) {
+      return jsonResponse(response, 400, { error: "공유 링크가 올바르지 않습니다." }, "no-store");
+    }
+
+    try {
+      const database = getDatabase(databaseUrl);
+      const result = await database.execute<PortfolioSnapshotRow>(sql`
+        SELECT snapshot
+        FROM public_portfolio_snapshots
+        WHERE snapshot_id = ${snapshotId}
+        LIMIT 1
+      `);
+      const snapshot = result.rows[0]?.snapshot as Partial<PublicPortfolio> | undefined;
+      if (!snapshot?.profile?.login || !Array.isArray(snapshot.items)) {
+        return jsonResponse(response, 404, { error: "공유된 포트폴리오를 찾지 못했습니다." }, "no-store");
+      }
+      return jsonResponse(response, 200, snapshot, "public, max-age=31536000, immutable");
+    } catch (error) {
+      console.error("Public portfolio snapshot fetch failed", error);
+      return jsonResponse(response, 500, { error: "공유된 포트폴리오를 열지 못했습니다." }, "no-store");
+    }
+  }
+
+  response.setHeader("Allow", "GET, POST");
+  return jsonResponse(response, 405, { error: "지원하지 않는 요청 방식입니다." }, "no-store");
 };

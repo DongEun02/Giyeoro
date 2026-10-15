@@ -4,7 +4,8 @@
     { "source": "/issues/:path*", "destination": "/index.html" },
     { "source": "/guides/:path*", "destination": "/index.html" },
     { "source": "/mypage", "destination": "/index.html" },
-    { "source": "/portfolio/:path*", "destination": "/index.html" }
+    { "source": "/portfolio/:path*", "destination": "/index.html" },
+    { "source": "/share/:path*", "destination": "/index.html" }
   ],
   "headers": [
     {

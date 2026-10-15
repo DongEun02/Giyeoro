@@ -26,7 +26,7 @@ export default function App() {
   const navigate = useNavigate();
   const view = location.pathname.startsWith("/mypage")
     ? "mypage"
-    : location.pathname.startsWith("/portfolio")
+    : location.pathname.startsWith("/portfolio") || location.pathname.startsWith("/share")
       ? "portfolio"
       : location.pathname.startsWith("/privacy") ? "privacy" : "landing";
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -168,6 +168,7 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/mypage" element={<WorkspacePage />} />
             <Route path="/portfolio/:login" element={<PortfolioPage />} />
+            <Route path="/share/:snapshotId" element={<PortfolioPage snapshot />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -1,7 +1,10 @@
 import { handleGithubPullRequestRequest } from "./githubPullRequestService.js";
 import { handleGithubPullRequestSyncRequest } from "./githubPullRequestSyncService.js";
 import type { GithubAuthOptions } from "./githubAuthService.js";
-import { handlePublicPortfolioRequest } from "./publicPortfolioService.js";
+import {
+  handlePublicPortfolioRequest,
+  handlePublicPortfolioSnapshotRequest
+} from "./publicPortfolioService.js";
 import { handleWorkspaceRequest } from "./workspaceService.js";
 
 type WorkspaceApiOptions = GithubAuthOptions & {
@@ -18,6 +21,9 @@ export const handleWorkspaceApiRequest = (
   const operation = requestUrl.searchParams.get("operation");
   if (operation === "portfolio") {
     return handlePublicPortfolioRequest(request, response, options);
+  }
+  if (operation === "portfolio-snapshot") {
+    return handlePublicPortfolioSnapshotRequest(request, response, options);
   }
   if (operation === "sync-pull-requests") {
     return handleGithubPullRequestSyncRequest(request, response, options);

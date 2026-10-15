@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   isPublicPortfolioItem,
-  isValidPortfolioLogin
+  isValidPortfolioLogin,
+  isValidPortfolioSnapshotId
 } from "./publicPortfolioService.js";
 
 test("공개 포트폴리오 GitHub 사용자 이름을 검증한다", () => {
@@ -10,6 +11,12 @@ test("공개 포트폴리오 GitHub 사용자 이름을 검증한다", () => {
   assert.equal(isValidPortfolioLogin("hello-world-7"), true);
   assert.equal(isValidPortfolioLogin("bad/login"), false);
   assert.equal(isValidPortfolioLogin(""), false);
+});
+
+test("공유 스냅샷 ID를 검증한다", () => {
+  assert.equal(isValidPortfolioSnapshotId("AbCdEfGhIjKlMnOpQrStUvWx"), true);
+  assert.equal(isValidPortfolioSnapshotId("bad/id"), false);
+  assert.equal(isValidPortfolioSnapshotId("too-short"), false);
 });
 
 test("이슈는 완료 상태여도 공개하지 않는다", () => {

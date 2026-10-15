@@ -5,6 +5,7 @@ import { MyPageLoginGate } from "../components/MyPageLoginGate";
 import { useOssApp } from "../app/OssAppContext";
 import type { IgnoredPullRequest, PullRequestSyncResult } from "../services/workspace";
 import { hideRemoteRepository, restoreIgnoredRepository } from "../services/workspace";
+import { createPublicPortfolioSnapshot } from "../services/publicPortfolio";
 
 const EMPTY_SYNC_RESULT = {
   syncedAt: "",
@@ -23,6 +24,7 @@ export function WorkspacePage() {
   const [pullRequestSyncResult, setPullRequestSyncResult] = useState(() => EMPTY_SYNC_RESULT);
   const [updatingRepository, setUpdatingRepository] = useState("");
   const [portfolioCopied, setPortfolioCopied] = useState(false);
+  const [portfolioShareLoading, setPortfolioShareLoading] = useState(false);
   const {
     authUser,
     authLoading,
@@ -43,13 +45,19 @@ export function WorkspacePage() {
     : "/mypage";
 
   const handlePortfolioShare = async () => {
+    if (portfolioShareLoading) return;
+    setPortfolioShareLoading(true);
+    setPortfolioCopied(false);
     try {
-      const shareUrl = new URL(portfolioPath, window.location.origin).toString();
+      const snapshotId = await createPublicPortfolioSnapshot();
+      const shareUrl = new URL(`/share/${encodeURIComponent(snapshotId)}`, window.location.origin).toString();
       await navigator.clipboard.writeText(shareUrl);
       setPortfolioCopied(true);
-      triggerToast("공개 포트폴리오 링크를 복사했습니다.");
-    } catch {
-      triggerToast("링크를 복사하지 못했습니다. 브라우저 권한을 확인해 주세요.");
+      triggerToast("현재 포트폴리오를 공유본으로 저장하고 링크를 복사했습니다.");
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : "공유 링크를 만들지 못했습니다.");
+    } finally {
+      setPortfolioShareLoading(false);
     }
   };
 
@@ -170,6 +178,7 @@ export function WorkspacePage() {
         onOpenPortfolio={() => navigate(portfolioPath)}
         onSharePortfolio={handlePortfolioShare}
         portfolioCopied={portfolioCopied}
+        portfolioShareLoading={portfolioShareLoading}
         pullRequestSyncLoading={pullRequestSyncLoading}
         pullRequestSyncError={pullRequestSyncError}
         pullRequestSyncedAt={pullRequestSyncResult.syncedAt}

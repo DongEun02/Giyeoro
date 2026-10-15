@@ -13,6 +13,7 @@ type MyPageProps = {
   onOpenPortfolio: () => void;
   onSharePortfolio: () => void;
   portfolioCopied: boolean;
+  portfolioShareLoading: boolean;
   pullRequestSyncLoading: boolean;
   pullRequestSyncError: string;
   pullRequestSyncedAt: string;
@@ -77,7 +78,7 @@ const groupPullRequests = (items: Record<string, WorkspaceItem>): RepositoryGrou
   ));
 };
 
-export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio, portfolioCopied,
+export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio, portfolioCopied, portfolioShareLoading,
   pullRequestSyncLoading, pullRequestSyncError, pullRequestSyncedAt, pullRequestImportedCount,
   pullRequestScannedCount, pullRequestSyncTruncated, ignoredPullRequests, onPullRequestSync,
   updatingRepository, onHideRepository, onRestoreRepository }: MyPageProps) => {
@@ -117,9 +118,9 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
           <div><strong>{mergedCount}</strong><span>병합된 PR</span></div>
           <div><strong>{openCount}</strong><span>진행 중 PR</span></div>
         </div>
-        <button type="button" className="mypage-portfolio-share-button" onClick={onSharePortfolio}>
+        <button type="button" className="mypage-portfolio-share-button" onClick={onSharePortfolio} disabled={portfolioShareLoading}>
           {portfolioCopied ? <Icons.Check className="w-4 h-4" /> : <Icons.Clipboard className="w-4 h-4" />}
-          {portfolioCopied ? "링크 복사됨" : "포트폴리오 공유"}
+          {portfolioShareLoading ? "공유본 만드는 중" : portfolioCopied ? "링크 복사됨" : "포트폴리오 공유"}
         </button>
       </section>
 

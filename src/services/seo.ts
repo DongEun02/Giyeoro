@@ -53,7 +53,7 @@ function getSeoConfig(pathname: string): SeoConfig {
     };
   }
 
-  if (pathname.startsWith("/portfolio")) {
+  if (pathname.startsWith("/portfolio") || pathname.startsWith("/share")) {
     return {
       title: "오픈소스 기여 포트폴리오 | 기여로",
       description: "GitHub에서 병합된 오픈소스 Pull Request를 프로젝트별로 확인하세요.",
