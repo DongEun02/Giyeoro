@@ -52,6 +52,11 @@ type PullRequestNode = {
 
 type SyncStateRow = {
   pull_requests_synced_at: Date | string | null;
+  pull_requests_scanned_count: number;
+  pull_requests_imported_count: number;
+  pull_requests_updated_count: number;
+  pull_requests_sync_truncated: boolean;
+  pull_requests_sync_metrics_ready: boolean;
 };
 
 type ExistingItemRow = {
@@ -191,7 +196,8 @@ const mapPullRequestItem = (pullRequest: PullRequestNode): WorkspaceItem => {
   const repositoryName = text(repository.nameWithOwner, 300);
   const merged = pullRequest.merged === true;
   const draft = pullRequest.isDraft === true;
-  const stateLabel = merged ? "병합됨" : draft ? "초안" : "검토 중";
+  const closed = pullRequest.state === "CLOSED";
+  const stateLabel = merged ? "병합됨" : closed ? "닫힘" : draft ? "초안" : "검토 중";
   const changedFiles = integer(pullRequest.changedFiles);
   const additions = integer(pullRequest.additions);
   const deletions = integer(pullRequest.deletions);
@@ -199,7 +205,7 @@ const mapPullRequestItem = (pullRequest: PullRequestNode): WorkspaceItem => {
   return {
     id: itemId(pullRequest),
     kind: "pull_request",
-    status: merged ? "completed" : "in_progress",
+    status: merged || closed ? "completed" : "in_progress",
     repo: repositoryName,
     title: text(pullRequest.title, 500, `Pull Request #${integer(pullRequest.number)}`),
     summary: plainTextSummary(
@@ -223,7 +229,7 @@ const mapPullRequestItem = (pullRequest: PullRequestNode): WorkspaceItem => {
         avatarUrl: text(pullRequest.author?.avatarUrl, 2_000),
         url: text(pullRequest.author?.url, 2_000)
       },
-      state: merged ? "closed" : "open",
+      state: merged || closed ? "closed" : "open",
       draft,
       merged,
       mergedAt: pullRequest.mergedAt || null,
@@ -240,6 +246,15 @@ const mapPullRequestItem = (pullRequest: PullRequestNode): WorkspaceItem => {
     }
   };
 };
+
+export const selectPullRequestsToSync = (
+  nodes: PullRequestNode[],
+  githubLogin: string,
+  existingIds: Set<string>
+) => nodes
+  .filter(node => isEligibleContributionPullRequest(node, githubLogin)
+    || (node.state === "CLOSED" && node.merged !== true && existingIds.has(itemId(node))))
+  .map(mapPullRequestItem);
 
 const githubHeaders = (githubToken: string) => ({
   Accept: "application/vnd.github+json",
@@ -392,7 +407,9 @@ export const handleGithubPullRequestSyncRequest = async (
     const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
     const force = requestUrl.searchParams.get("force") === "1";
     const syncState = await database.execute<SyncStateRow>(sql`
-      SELECT pull_requests_synced_at
+      SELECT pull_requests_synced_at, pull_requests_scanned_count,
+        pull_requests_imported_count, pull_requests_updated_count,
+        pull_requests_sync_truncated, pull_requests_sync_metrics_ready
       FROM users
       WHERE github_id = ${user.id}
       LIMIT 1
@@ -400,14 +417,14 @@ export const handleGithubPullRequestSyncRequest = async (
     const lastSyncedAt = syncState.rows[0]?.pull_requests_synced_at || null;
     const lastSyncedAtMs = lastSyncedAt ? new Date(lastSyncedAt).getTime() : 0;
 
-    if (!force && lastSyncedAtMs > Date.now() - SYNC_TTL_MS) {
+    if (!force && syncState.rows[0]?.pull_requests_sync_metrics_ready && lastSyncedAtMs > Date.now() - SYNC_TTL_MS) {
       return syncResponse(response, database, user.id, {
         synced: false,
         syncedAt: new Date(lastSyncedAt!).toISOString(),
-        importedCount: 0,
-        updatedCount: 0,
-        scannedCount: 0,
-        truncated: false
+        importedCount: syncState.rows[0]?.pull_requests_imported_count || 0,
+        updatedCount: syncState.rows[0]?.pull_requests_updated_count || 0,
+        scannedCount: syncState.rows[0]?.pull_requests_scanned_count || 0,
+        truncated: syncState.rows[0]?.pull_requests_sync_truncated || false
       });
     }
 
@@ -430,9 +447,7 @@ export const handleGithubPullRequestSyncRequest = async (
     const ignoredIds = new Set(ignoredResult.rows.map(row => row.item_id));
     const ignoredRepositories = new Set(ignoredResult.rows.map(row => row.repo.toLowerCase()));
     const existingIds = new Set(existingResult.rows.map(row => row.item_id));
-    const eligibleItems = nodes
-      .filter(node => isEligibleContributionPullRequest(node, user.login))
-      .map(mapPullRequestItem)
+    const eligibleItems = selectPullRequestsToSync(nodes, user.login, existingIds)
       .filter(item => !ignoredIds.has(item.id) && !ignoredRepositories.has(item.repo.toLowerCase()));
     const importedCount = eligibleItems.filter(item => !existingIds.has(item.id)).length;
 
@@ -446,7 +461,13 @@ export const handleGithubPullRequestSyncRequest = async (
     const syncedAt = new Date().toISOString();
     await database.execute(sql`
       UPDATE users
-      SET pull_requests_synced_at = ${syncedAt}, updated_at = NOW()
+      SET pull_requests_synced_at = ${syncedAt},
+        pull_requests_scanned_count = ${nodes.length},
+        pull_requests_imported_count = ${importedCount},
+        pull_requests_updated_count = ${eligibleItems.length - importedCount},
+        pull_requests_sync_truncated = ${truncated},
+        pull_requests_sync_metrics_ready = TRUE,
+        updated_at = NOW()
       WHERE github_id = ${user.id}
     `);
 

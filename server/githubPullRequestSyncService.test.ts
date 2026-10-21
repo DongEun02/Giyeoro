@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   fetchAuthoredPullRequests,
-  isEligibleContributionPullRequest
+  isEligibleContributionPullRequest,
+  selectPullRequestsToSync
 } from "./githubPullRequestSyncService.js";
 
 const contribution = (overrides: Record<string, unknown> = {}) => ({
@@ -50,6 +51,19 @@ test("병합된 PR은 허용한다", () => {
     state: "MERGED",
     merged: true
   }), "contributor"), true);
+});
+
+test("저장된 PR이 병합 없이 닫히면 Closed로 갱신하고 새 닫힌 PR은 가져오지 않는다", () => {
+  const closed = contribution({ state: "CLOSED", merged: false, closedAt: "2026-10-21T00:00:00Z" });
+  const existingId = "github-pr-opensource/library-12";
+  assert.deepEqual(selectPullRequestsToSync([closed], "contributor", new Set()), []);
+
+  const [item] = selectPullRequestsToSync([closed], "contributor", new Set([existingId]));
+  assert.equal(item.id, existingId);
+  assert.equal(item.status, "completed");
+  assert.equal(item.difficulty, "닫힘");
+  assert.equal(item.data.state, "closed");
+  assert.equal(item.data.merged, false);
 });
 
 test("GitHub가 빈 응답을 반환하면 다시 요청한다", async t => {

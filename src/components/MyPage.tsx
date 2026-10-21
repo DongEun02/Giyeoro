@@ -32,6 +32,7 @@ type RepositoryGroup = {
   items: WorkspaceItem[];
   mergedCount: number;
   openCount: number;
+  closedCount: number;
   additions: number;
   deletions: number;
   changedFiles: number;
@@ -48,6 +49,10 @@ const contributionDateFormatter = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric", month: "short", day: "numeric"
 });
 
+const pullRequestState = (item: WorkspaceItem) => item.data?.merged === true
+  ? "Merged"
+  : item.data?.state === "closed" || item.data?.closedAt ? "Closed" : "Open";
+
 const groupPullRequests = (items: Record<string, WorkspaceItem>): RepositoryGroup[] => {
   const groups = new Map<string, WorkspaceItem[]>();
   Object.values(items).forEach(item => {
@@ -63,7 +68,8 @@ const groupPullRequests = (items: Record<string, WorkspaceItem>): RepositoryGrou
       repo,
       items: sorted,
       mergedCount: sorted.filter(item => item.data?.merged === true).length,
-      openCount: sorted.filter(item => item.data?.merged !== true).length,
+      openCount: sorted.filter(item => pullRequestState(item) === "Open").length,
+      closedCount: sorted.filter(item => pullRequestState(item) === "Closed").length,
       additions: sorted.reduce((sum, item) => sum + Number(item.data?.additions || 0), 0),
       deletions: sorted.reduce((sum, item) => sum + Number(item.data?.deletions || 0), 0),
       changedFiles: sorted.reduce((sum, item) => sum + Number(item.data?.changedFiles || 0), 0),
@@ -91,6 +97,7 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
   }, [ignoredPullRequests]);
   const mergedCount = repositories.reduce((sum, repo) => sum + repo.mergedCount, 0);
   const openCount = repositories.reduce((sum, repo) => sum + repo.openCount, 0);
+  const savedPullRequestCount = Object.values(items).filter(item => item.kind === "pull_request").length;
   const syncedAtLabel = pullRequestSyncedAt ? syncDateFormatter.format(new Date(pullRequestSyncedAt)) : "아직 동기화 전";
 
   const toggleExpanded = (repo: string) => setExpandedRepos(current => {
@@ -127,7 +134,7 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
       <section className="mypage-pr-sync contribution-sync" aria-labelledby="sync-title">
         <div className="mypage-pr-sync-copy"><span>GitHub Sync</span><h2 id="sync-title">스타 50개 이상인 프로젝트의 PR을 모아요</h2><p>공개된 외부 저장소의 열린 PR과 병합된 PR을 가져와 프로젝트별로 정리합니다. 프로젝트 하나를 통째로 숨길 수도 있어요.</p></div>
         <div className="mypage-pr-sync-actions">
-          <div className="mypage-pr-sync-status" aria-live="polite"><span>{pullRequestSyncLoading ? "GitHub에서 확인 중" : `최근 동기화 ${syncedAtLabel}`}</span>{pullRequestSyncedAt && !pullRequestSyncLoading ? <small>최근 PR {pullRequestScannedCount}개 확인 · 새로 저장 {pullRequestImportedCount}개{pullRequestSyncTruncated ? " · 최근 300개 기준" : ""}</small> : null}</div>
+          <div className="mypage-pr-sync-status" aria-live="polite"><span>{pullRequestSyncLoading ? "GitHub에서 확인 중" : `최근 동기화 ${syncedAtLabel}`}</span>{!pullRequestSyncLoading ? <small>저장된 PR {savedPullRequestCount}개{pullRequestSyncedAt ? ` · 마지막 자동 동기화: ${pullRequestScannedCount}개 확인, ${pullRequestImportedCount}개 새로 저장${pullRequestSyncTruncated ? " · 최근 300개 기준" : ""}` : ""}</small> : null}</div>
           <button type="button" onClick={onPullRequestSync} disabled={pullRequestSyncLoading}><Icons.Refresh className="w-4 h-4" />{pullRequestSyncLoading ? "동기화 중" : "지금 동기화"}</button>
         </div>
         {pullRequestSyncError ? <p className="mypage-pr-sync-error" role="alert">{pullRequestSyncError}</p> : null}
@@ -141,11 +148,11 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
           return <article className="contribution-project-card" key={project.repo}>
             <header>
               <img src={project.avatarUrl || getRepoVisual(project.repo).image} alt="" referrerPolicy="no-referrer" />
-              <div className="contribution-project-title"><span>{project.languageTags.join(" · ") || "Open Source"}</span><h3>{project.repo}</h3><p>★ {project.repositoryStars.toLocaleString()} · {project.mergedCount}개 병합 · {project.openCount}개 진행 중 · 변경 파일 {project.changedFiles}개</p></div>
+              <div className="contribution-project-title"><span>{project.languageTags.join(" · ") || "Open Source"}</span><h3>{project.repo}</h3><p>★ {project.repositoryStars.toLocaleString()} · {project.mergedCount}개 병합 · {project.openCount}개 진행 중{project.closedCount ? ` · ${project.closedCount}개 닫힘` : ""} · 변경 파일 {project.changedFiles}개</p></div>
               <div className="contribution-project-diff" aria-label={`추가 ${project.additions.toLocaleString()}줄, 삭제 ${project.deletions.toLocaleString()}줄`}><span className="contribution-additions">+{project.additions.toLocaleString()}</span><span className="contribution-deletions">-{project.deletions.toLocaleString()}</span></div>
               <button type="button" className="contribution-hide-button" onClick={() => onHideRepository(project.repo)} disabled={!!updatingRepository}>{updatingRepository === project.repo ? "숨기는 중" : "프로젝트 숨기기"}</button>
             </header>
-            <div className="contribution-pr-list">{visibleItems.map(item => <button type="button" className="contribution-pr-row" key={item.id} onClick={() => onOpen(item)}><span className={item.data?.merged === true ? "is-merged" : "is-open"}>{item.data?.merged === true ? "Merged" : "Open"}</span><strong>{item.title}</strong><small>#{item.data?.number || ""} · {contributionDateFormatter.format(new Date(item.data?.mergedAt || item.updatedAt))}</small><Icons.ArrowRight className="w-4 h-4" /></button>)}</div>
+            <div className="contribution-pr-list">{visibleItems.map(item => { const state = pullRequestState(item); return <button type="button" className="contribution-pr-row" key={item.id} onClick={() => onOpen(item)}><span className={`is-${state.toLowerCase()}`}>{state}</span><strong>{item.title}</strong><small>#{item.data?.number || ""} · {contributionDateFormatter.format(new Date(item.data?.mergedAt || item.data?.closedAt || item.updatedAt))}</small><Icons.ArrowRight className="w-4 h-4" /></button>; })}</div>
             {project.items.length > 3 ? <button type="button" className="contribution-expand-button" onClick={() => toggleExpanded(project.repo)}>{expanded ? "대표 PR만 보기" : `전체 PR ${project.items.length}개 보기`}</button> : null}
           </article>;
         })}</div> : <div className="mypage-empty"><Icons.GitPullRequest className="w-5 h-5" /><strong>아직 모은 PR이 없습니다.</strong><p>GitHub 동기화를 실행하면 프로젝트별 기여가 여기에 정리됩니다.</p><button type="button" onClick={onPullRequestSync}>GitHub PR 동기화</button></div>}

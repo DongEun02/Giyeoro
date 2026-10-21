@@ -1,0 +1,6 @@
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS pull_requests_scanned_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pull_requests_imported_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pull_requests_updated_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pull_requests_sync_truncated BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS pull_requests_sync_metrics_ready BOOLEAN NOT NULL DEFAULT FALSE;
