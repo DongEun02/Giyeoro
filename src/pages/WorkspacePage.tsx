@@ -12,7 +12,7 @@ const EMPTY_SYNC_RESULT = {
   importedCount: 0,
   updatedCount: 0,
   scannedCount: 0,
-  minimumStars: 100,
+  minimumStars: 50,
   truncated: false,
   ignoredItems: [] as IgnoredPullRequest[]
 };
@@ -20,6 +20,7 @@ const EMPTY_SYNC_RESULT = {
 export function WorkspacePage() {
   const navigate = useNavigate();
   const [pullRequestSyncLoading, setPullRequestSyncLoading] = useState(false);
+  const [pullRequestSyncProgress, setPullRequestSyncProgress] = useState(0);
   const [pullRequestSyncError, setPullRequestSyncError] = useState("");
   const [pullRequestSyncResult, setPullRequestSyncResult] = useState(() => EMPTY_SYNC_RESULT);
   const [updatingRepository, setUpdatingRepository] = useState("");
@@ -37,6 +38,7 @@ export function WorkspacePage() {
   } = useOssApp();
   const syncGithubPullRequestsRef = useRef(syncGithubPullRequests);
   const triggerToastRef = useRef(triggerToast);
+  const syncControllerRef = useRef<AbortController | null>(null);
   syncGithubPullRequestsRef.current = syncGithubPullRequests;
   triggerToastRef.current = triggerToast;
 
@@ -76,38 +78,61 @@ export function WorkspacePage() {
   const runPullRequestSync = useCallback(async (
     force: boolean,
     announce: boolean,
-    signal?: AbortSignal
+    controller = new AbortController()
   ) => {
+    if (syncControllerRef.current && !syncControllerRef.current.signal.aborted) return;
+    syncControllerRef.current = controller;
     setPullRequestSyncLoading(true);
+    setPullRequestSyncProgress(0);
     setPullRequestSyncError("");
+    let importedCount = 0;
+    let scannedCount = 0;
     try {
-      const result = await syncGithubPullRequestsRef.current(force, signal) as PullRequestSyncResult;
-      applySyncResult(result);
+      let nextForce = force;
+      while (!controller.signal.aborted) {
+        const result = await syncGithubPullRequestsRef.current(nextForce, controller.signal) as PullRequestSyncResult;
+        if (controller.signal.aborted) return;
+        applySyncResult(result);
+        if (result.synced) {
+          importedCount += result.importedCount;
+          scannedCount += result.scannedCount;
+          setPullRequestSyncProgress(scannedCount);
+        }
+        if (!result.truncated) break;
+        nextForce = false;
+        await new Promise(resolve => window.setTimeout(resolve, 500));
+      }
+      if (controller.signal.aborted) return;
       if (announce) {
         triggerToastRef.current(
-          result.importedCount > 0
-            ? `새로운 GitHub PR ${result.importedCount}개를 가져왔습니다.`
+          importedCount > 0
+            ? `새로운 GitHub PR ${importedCount}개를 가져왔습니다.`
             : "GitHub PR을 최신 상태로 확인했습니다."
         );
       }
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (controller.signal.aborted) return;
       const message = error instanceof Error
         ? error.message
         : "GitHub에서 기여한 PR을 동기화하지 못했습니다.";
       setPullRequestSyncError(message);
       if (announce) triggerToastRef.current(message);
     } finally {
-      if (!signal?.aborted) setPullRequestSyncLoading(false);
+      if (syncControllerRef.current === controller) {
+        syncControllerRef.current = null;
+        if (!controller.signal.aborted) setPullRequestSyncLoading(false);
+      }
     }
   }, [applySyncResult]);
 
   useEffect(() => {
     if (authLoading || !authUser || workspaceLoading) return undefined;
     const controller = new AbortController();
-    void runPullRequestSync(false, false, controller.signal);
+    void runPullRequestSync(false, false, controller);
     return () => controller.abort();
   }, [authLoading, authUser?.login, workspaceLoading, runPullRequestSync]);
+
+  useEffect(() => () => syncControllerRef.current?.abort(), []);
 
   const handleHideRepository = async (repo: string) => {
     if (updatingRepository) return;
@@ -180,13 +205,14 @@ export function WorkspacePage() {
         portfolioCopied={portfolioCopied}
         portfolioShareLoading={portfolioShareLoading}
         pullRequestSyncLoading={pullRequestSyncLoading}
+        pullRequestSyncProgress={pullRequestSyncProgress}
         pullRequestSyncError={pullRequestSyncError}
         pullRequestSyncedAt={pullRequestSyncResult.syncedAt}
         pullRequestImportedCount={pullRequestSyncResult.importedCount}
         pullRequestScannedCount={pullRequestSyncResult.scannedCount}
         pullRequestSyncTruncated={pullRequestSyncResult.truncated}
         ignoredPullRequests={pullRequestSyncResult.ignoredItems}
-        onPullRequestSync={() => runPullRequestSync(true, true)}
+        onPullRequestSync={() => runPullRequestSync(!pullRequestSyncResult.truncated, true)}
         updatingRepository={updatingRepository}
         onHideRepository={handleHideRepository}
         onRestoreRepository={handleRestoreRepository}

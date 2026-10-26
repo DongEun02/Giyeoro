@@ -52,11 +52,14 @@ type PullRequestNode = {
 
 type SyncStateRow = {
   pull_requests_synced_at: Date | string | null;
+  pull_requests_recent_synced_at: Date | string | null;
   pull_requests_scanned_count: number;
   pull_requests_imported_count: number;
   pull_requests_updated_count: number;
   pull_requests_sync_truncated: boolean;
   pull_requests_sync_metrics_ready: boolean;
+  pull_requests_history_cursor: string | null;
+  pull_requests_history_complete: boolean;
 };
 
 type ExistingItemRow = {
@@ -76,12 +79,20 @@ type PullRequestSearchPayload = {
   data?: {
     search?: {
       nodes?: PullRequestNode[];
-      pageInfo?: {
-        hasNextPage?: boolean;
-        endCursor?: string | null;
+      pageInfo?: PullRequestPageInfo;
+    };
+    user?: {
+      pullRequests?: {
+        nodes?: PullRequestNode[];
+        pageInfo?: PullRequestPageInfo;
       };
     };
   };
+};
+
+type PullRequestPageInfo = {
+  hasNextPage?: boolean;
+  endCursor?: string | null;
 };
 
 const GITHUB_API_VERSION = "2022-11-28";
@@ -92,45 +103,64 @@ const MAX_PAGES = 3;
 const GITHUB_FETCH_ATTEMPTS = 3;
 const GITHUB_RETRY_DELAY_MS = 250;
 
+const PULL_REQUEST_FIELDS = `
+  fragment PullRequestFields on PullRequest {
+    number
+    title
+    bodyText
+    state
+    isDraft
+    merged
+    mergedAt
+    closedAt
+    createdAt
+    updatedAt
+    additions
+    deletions
+    changedFiles
+    url
+    baseRefName
+    headRefName
+    comments { totalCount }
+    reviews { totalCount }
+    author { login avatarUrl url }
+    repository {
+      nameWithOwner
+      stargazerCount
+      isPrivate
+      isArchived
+      isDisabled
+      primaryLanguage { name }
+      licenseInfo { spdxId name url }
+      owner { login avatarUrl }
+    }
+  }
+`;
+
 const PULL_REQUEST_SEARCH_QUERY = `
   query AuthoredPullRequests($query: String!, $first: Int!, $after: String) {
     search(type: ISSUE, query: $query, first: $first, after: $after) {
       nodes {
         ... on PullRequest {
-          number
-          title
-          bodyText
-          state
-          isDraft
-          merged
-          mergedAt
-          closedAt
-          createdAt
-          updatedAt
-          additions
-          deletions
-          changedFiles
-          url
-          baseRefName
-          headRefName
-          comments { totalCount }
-          reviews { totalCount }
-          author { login avatarUrl url }
-          repository {
-            nameWithOwner
-            stargazerCount
-            isPrivate
-            isArchived
-            isDisabled
-            primaryLanguage { name }
-            licenseInfo { spdxId name url }
-            owner { login avatarUrl }
-          }
+          ...PullRequestFields
         }
       }
       pageInfo { hasNextPage endCursor }
     }
   }
+  ${PULL_REQUEST_FIELDS}
+`;
+
+const PULL_REQUEST_HISTORY_QUERY = `
+  query AuthoredPullRequestHistory($login: String!, $first: Int!, $after: String) {
+    user(login: $login) {
+      pullRequests(first: $first, after: $after, orderBy: {field: CREATED_AT, direction: DESC}) {
+        nodes { ...PullRequestFields }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+  ${PULL_REQUEST_FIELDS}
 `;
 
 const jsonResponse = (response: any, status: number, body: unknown) => {
@@ -267,23 +297,17 @@ const githubHeaders = (githubToken: string) => ({
 const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 const fetchGithubPullRequestPage = async (
-  user: GithubUser,
   githubToken: string,
-  cursor: string | null
+  query: string,
+  variables: Record<string, unknown>,
+  connection: "search" | "history"
 ) => {
   for (let attempt = 1; attempt <= GITHUB_FETCH_ATTEMPTS; attempt += 1) {
     try {
       const githubResponse = await fetch("https://api.github.com/graphql", {
         method: "POST",
         headers: githubHeaders(githubToken),
-        body: JSON.stringify({
-          query: PULL_REQUEST_SEARCH_QUERY,
-          variables: {
-            query: `is:pr author:${user.login} sort:updated-desc`,
-            first: PAGE_SIZE,
-            after: cursor
-          }
-        }),
+        body: JSON.stringify({ query, variables }),
         signal: AbortSignal.timeout(25_000)
       });
       if (githubResponse.status === 403 || githubResponse.status === 429) {
@@ -294,7 +318,9 @@ const fetchGithubPullRequestPage = async (
       const rawPayload = await githubResponse.text();
       if (!rawPayload.trim()) throw new Error("GITHUB_EMPTY_RESPONSE");
       const payload = JSON.parse(rawPayload) as PullRequestSearchPayload;
-      if (payload.errors?.length || !payload.data?.search) throw new Error("GITHUB_FETCH_FAILED");
+      if (payload.errors?.length || (connection === "search"
+        ? !payload.data?.search
+        : !payload.data?.user?.pullRequests)) throw new Error("GITHUB_FETCH_FAILED");
       return payload;
     } catch (error) {
       if (error instanceof Error && error.message === "GITHUB_RATE_LIMIT") throw error;
@@ -312,7 +338,11 @@ export const fetchAuthoredPullRequests = async (user: GithubUser, githubToken: s
   let truncated = false;
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
-    const payload = await fetchGithubPullRequestPage(user, githubToken, cursor);
+    const payload = await fetchGithubPullRequestPage(githubToken, PULL_REQUEST_SEARCH_QUERY, {
+      query: `is:pr author:${user.login} sort:updated-desc`,
+      first: PAGE_SIZE,
+      after: cursor
+    }, "search");
     const search = payload.data?.search;
     nodes.push(...(Array.isArray(search?.nodes) ? search.nodes.filter(Boolean) : []));
     cursor = search?.pageInfo?.endCursor || null;
@@ -321,6 +351,24 @@ export const fetchAuthoredPullRequests = async (user: GithubUser, githubToken: s
   }
 
   return { nodes, truncated };
+};
+
+export const fetchAuthoredPullRequestHistoryPage = async (
+  user: GithubUser,
+  githubToken: string,
+  cursor: string | null
+) => {
+  const payload = await fetchGithubPullRequestPage(githubToken, PULL_REQUEST_HISTORY_QUERY, {
+    login: user.login,
+    first: PAGE_SIZE,
+    after: cursor
+  }, "history");
+  const history = payload.data!.user!.pullRequests!;
+  const nodes = Array.isArray(history.nodes) ? history.nodes.filter(Boolean) : [];
+  const hasMore = history.pageInfo?.hasNextPage === true;
+  const nextCursor = history.pageInfo?.endCursor || null;
+  if (hasMore && (!nextCursor || nextCursor === cursor)) throw new Error("GITHUB_FETCH_FAILED");
+  return { nodes, nextCursor, hasMore };
 };
 
 const resolveDatabaseUrl = (options: PullRequestSyncOptions) => (
@@ -407,17 +455,23 @@ export const handleGithubPullRequestSyncRequest = async (
     const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
     const force = requestUrl.searchParams.get("force") === "1";
     const syncState = await database.execute<SyncStateRow>(sql`
-      SELECT pull_requests_synced_at, pull_requests_scanned_count,
+      SELECT pull_requests_synced_at, pull_requests_recent_synced_at, pull_requests_scanned_count,
         pull_requests_imported_count, pull_requests_updated_count,
-        pull_requests_sync_truncated, pull_requests_sync_metrics_ready
+        pull_requests_sync_truncated, pull_requests_sync_metrics_ready,
+        pull_requests_history_cursor, pull_requests_history_complete
       FROM users
       WHERE github_id = ${user.id}
       LIMIT 1
     `);
     const lastSyncedAt = syncState.rows[0]?.pull_requests_synced_at || null;
-    const lastSyncedAtMs = lastSyncedAt ? new Date(lastSyncedAt).getTime() : 0;
+    const recentSyncedAt = syncState.rows[0]?.pull_requests_recent_synced_at || null;
+    const recentSyncedAtMs = recentSyncedAt ? new Date(recentSyncedAt).getTime() : 0;
 
-    if (!force && syncState.rows[0]?.pull_requests_sync_metrics_ready && lastSyncedAtMs > Date.now() - SYNC_TTL_MS) {
+    const recentSyncNeeded = force || !syncState.rows[0]?.pull_requests_sync_metrics_ready
+      || recentSyncedAtMs <= Date.now() - SYNC_TTL_MS;
+    const historySyncNeeded = !syncState.rows[0]?.pull_requests_history_complete;
+
+    if (!recentSyncNeeded && !historySyncNeeded) {
       return syncResponse(response, database, user.id, {
         synced: false,
         syncedAt: new Date(lastSyncedAt!).toISOString(),
@@ -433,8 +487,11 @@ export const handleGithubPullRequestSyncRequest = async (
       return jsonResponse(response, 503, { error: "GitHub PR 동기화 토큰이 설정되지 않았습니다." });
     }
 
-    const [{ nodes, truncated }, ignoredResult, existingResult] = await Promise.all([
-      fetchAuthoredPullRequests(user, githubToken),
+    const [recent, history, ignoredResult, existingResult] = await Promise.all([
+      recentSyncNeeded ? fetchAuthoredPullRequests(user, githubToken) : null,
+      historySyncNeeded
+        ? fetchAuthoredPullRequestHistoryPage(user, githubToken, syncState.rows[0]?.pull_requests_history_cursor || null)
+        : null,
       database.execute<{ item_id: string; repo: string }>(sql`
         SELECT item_id, repo FROM workspace_ignored_items
         WHERE user_id = ${user.id} AND kind = 'pull_request'
@@ -447,7 +504,11 @@ export const handleGithubPullRequestSyncRequest = async (
     const ignoredIds = new Set(ignoredResult.rows.map(row => row.item_id));
     const ignoredRepositories = new Set(ignoredResult.rows.map(row => row.repo.toLowerCase()));
     const existingIds = new Set(existingResult.rows.map(row => row.item_id));
-    const eligibleItems = selectPullRequestsToSync(nodes, user.login, existingIds)
+    const nodes = [...(recent?.nodes || []), ...(history?.nodes || [])];
+    const uniqueNodes = [...new Map(nodes.map(node => [itemId(node), node])).values()];
+    const historyComplete = history ? !history.hasMore : true;
+    const historyCursor = history?.hasMore ? history.nextCursor : null;
+    const eligibleItems = selectPullRequestsToSync(uniqueNodes, user.login, existingIds)
       .filter(item => !ignoredIds.has(item.id) && !ignoredRepositories.has(item.repo.toLowerCase()));
     const importedCount = eligibleItems.filter(item => !existingIds.has(item.id)).length;
 
@@ -462,11 +523,14 @@ export const handleGithubPullRequestSyncRequest = async (
     await database.execute(sql`
       UPDATE users
       SET pull_requests_synced_at = ${syncedAt},
+        pull_requests_recent_synced_at = ${recentSyncNeeded ? syncedAt : recentSyncedAt},
         pull_requests_scanned_count = ${nodes.length},
         pull_requests_imported_count = ${importedCount},
         pull_requests_updated_count = ${eligibleItems.length - importedCount},
-        pull_requests_sync_truncated = ${truncated},
+        pull_requests_sync_truncated = ${!historyComplete},
         pull_requests_sync_metrics_ready = TRUE,
+        pull_requests_history_cursor = ${historyCursor},
+        pull_requests_history_complete = ${historyComplete},
         updated_at = NOW()
       WHERE github_id = ${user.id}
     `);
@@ -477,7 +541,7 @@ export const handleGithubPullRequestSyncRequest = async (
       importedCount,
       updatedCount: eligibleItems.length - importedCount,
       scannedCount: nodes.length,
-      truncated
+      truncated: !historyComplete
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";

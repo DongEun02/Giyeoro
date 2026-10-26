@@ -15,6 +15,7 @@ type MyPageProps = {
   portfolioCopied: boolean;
   portfolioShareLoading: boolean;
   pullRequestSyncLoading: boolean;
+  pullRequestSyncProgress: number;
   pullRequestSyncError: string;
   pullRequestSyncedAt: string;
   pullRequestImportedCount: number;
@@ -85,7 +86,7 @@ const groupPullRequests = (items: Record<string, WorkspaceItem>): RepositoryGrou
 };
 
 export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio, portfolioCopied, portfolioShareLoading,
-  pullRequestSyncLoading, pullRequestSyncError, pullRequestSyncedAt, pullRequestImportedCount,
+  pullRequestSyncLoading, pullRequestSyncProgress, pullRequestSyncError, pullRequestSyncedAt, pullRequestImportedCount,
   pullRequestScannedCount, pullRequestSyncTruncated, ignoredPullRequests, onPullRequestSync,
   updatingRepository, onHideRepository, onRestoreRepository }: MyPageProps) => {
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(() => new Set());
@@ -134,8 +135,8 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
       <section className="mypage-pr-sync contribution-sync" aria-labelledby="sync-title">
         <div className="mypage-pr-sync-copy"><span>GitHub Sync</span><h2 id="sync-title">스타 50개 이상인 프로젝트의 PR을 모아요</h2><p>공개된 외부 저장소의 열린 PR과 병합된 PR을 가져와 프로젝트별로 정리합니다. 프로젝트 하나를 통째로 숨길 수도 있어요.</p></div>
         <div className="mypage-pr-sync-actions">
-          <div className="mypage-pr-sync-status" aria-live="polite"><span>{pullRequestSyncLoading ? "GitHub에서 확인 중" : `최근 동기화 ${syncedAtLabel}`}</span>{!pullRequestSyncLoading ? <small>저장된 PR {savedPullRequestCount}개{pullRequestSyncedAt ? ` · 마지막 자동 동기화: ${pullRequestScannedCount}개 확인, ${pullRequestImportedCount}개 새로 저장${pullRequestSyncTruncated ? " · 최근 300개 기준" : ""}` : ""}</small> : null}</div>
-          <button type="button" onClick={onPullRequestSync} disabled={pullRequestSyncLoading}><Icons.Refresh className="w-4 h-4" />{pullRequestSyncLoading ? "동기화 중" : "지금 동기화"}</button>
+          <div className="mypage-pr-sync-status" aria-live="polite"><span>{pullRequestSyncLoading ? `GitHub PR 자동 확인 중${pullRequestSyncProgress ? ` · 이번 방문 ${pullRequestSyncProgress}개 확인` : ""}` : `최근 동기화 ${syncedAtLabel}`}</span><small>저장된 PR {savedPullRequestCount}개{!pullRequestSyncLoading && pullRequestSyncedAt ? ` · 마지막 동기화: ${pullRequestScannedCount}개 확인, ${pullRequestImportedCount}개 새로 저장${pullRequestSyncTruncated ? " · 이어서 확인 가능" : ""}` : ""}</small></div>
+          <button type="button" onClick={onPullRequestSync} disabled={pullRequestSyncLoading}><Icons.Refresh className="w-4 h-4" />{pullRequestSyncLoading ? "확인 중" : pullRequestSyncError ? "다시 시도" : "지금 동기화"}</button>
         </div>
         {pullRequestSyncError ? <p className="mypage-pr-sync-error" role="alert">{pullRequestSyncError}</p> : null}
       </section>

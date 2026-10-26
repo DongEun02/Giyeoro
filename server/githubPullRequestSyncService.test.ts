@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   fetchAuthoredPullRequests,
+  fetchAuthoredPullRequestHistoryPage,
   isEligibleContributionPullRequest,
   selectPullRequestsToSync
 } from "./githubPullRequestSyncService.js";
@@ -93,4 +94,36 @@ test("GitHub가 빈 응답을 반환하면 다시 요청한다", async t => {
 
   assert.equal(requestCount, 2);
   assert.equal(result.nodes.length, 1);
+});
+
+test("과거 PR은 저장한 커서 다음 페이지부터 100개씩 읽는다", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    assert.match(body.query, /user\(login: \$login\)/);
+    assert.deepEqual(body.variables, { login: "contributor", first: 100, after: "saved-cursor" });
+    return Response.json({
+      data: {
+        user: {
+          pullRequests: {
+            nodes: [contribution({ number: 1 })],
+            pageInfo: { hasNextPage: true, endCursor: "next-cursor" }
+          }
+        }
+      }
+    });
+  };
+
+  const page = await fetchAuthoredPullRequestHistoryPage({
+    id: 1,
+    login: "contributor",
+    name: "Contributor",
+    avatarUrl: "",
+    profileUrl: ""
+  }, "token", "saved-cursor");
+
+  assert.equal(page.nodes.length, 1);
+  assert.equal(page.nextCursor, "next-cursor");
+  assert.equal(page.hasMore, true);
 });
