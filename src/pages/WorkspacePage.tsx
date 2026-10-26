@@ -44,7 +44,7 @@ export function WorkspacePage() {
 
   const portfolioPath = authUser
     ? `/portfolio/${encodeURIComponent(authUser.login)}`
-    : "/mypage";
+    : "/contributions";
 
   const handlePortfolioShare = async () => {
     if (portfolioShareLoading) return;

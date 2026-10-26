@@ -45,11 +45,11 @@ function getSeoConfig(pathname: string): SeoConfig {
     };
   }
 
-  if (pathname.startsWith("/mypage")) {
+  if (pathname === "/contributions" || pathname === "/mypage") {
     return {
       title: "내 오픈소스 기여 | 기여로",
       description: "GitHub Pull Request를 프로젝트별로 모으고 공개할 기여를 관리하세요.",
-      canonicalPath: "/mypage"
+      canonicalPath: "/contributions"
     };
   }
 

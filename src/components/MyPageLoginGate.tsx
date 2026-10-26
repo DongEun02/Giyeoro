@@ -26,7 +26,7 @@ export function MyPageLoginGate({ loading }: MyPageLoginGateProps) {
         <h1 id="mypage-login-heading">GitHub에 흩어진 PR을 한곳에 모아보세요</h1>
         <p>로그인하면 공개된 외부 프로젝트의 PR을 자동으로 가져와 프로젝트별로 정리합니다. 비공개 저장소 권한은 요청하지 않습니다.</p>
       </div>
-      <a href={getGithubLoginUrl("/mypage")} className="mypage-login-button">
+      <a href={getGithubLoginUrl("/contributions")} className="mypage-login-button">
         <Icons.Github className="w-4 h-4" /> GitHub로 로그인
       </a>
       <small>병합된 PR만 공개 페이지에 표시되며, 원하지 않는 프로젝트는 언제든 숨길 수 있습니다.</small>

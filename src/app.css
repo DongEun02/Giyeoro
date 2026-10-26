@@ -30,6 +30,12 @@
 .contribution-summary-stats { display: flex; gap: 28px; }.contribution-summary-stats div { display: flex; flex-direction: column; align-items: center; }.contribution-summary-stats strong { font-size: 22px; }.contribution-summary-stats span { color: #7b847f; font-size: 12px; }
 .contribution-sync { margin-bottom: 42px; }
 .contribution-section-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 18px; }.contribution-section-heading span { color: #32805b; font-size: 11px; font-weight: 800; letter-spacing: .1em; }.contribution-section-heading h2 { margin: 4px 0 0; font-size: 24px; }.contribution-section-heading > button { border: 0; background: transparent; display: flex; align-items: center; gap: 6px; color: #496057; cursor: pointer; font-weight: 700; }
+.contribution-status-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.contribution-status-filters button { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 8px 13px; border: 1px solid #dce4dd; border-radius: 999px; background: #fff; color: #52645b; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.contribution-status-filters button:hover { border-color: #8eb9a0; }
+.contribution-status-filters button:focus-visible { outline: 2px solid #32805b; outline-offset: 2px; }
+.contribution-status-filters button[aria-pressed="true"] { border-color: #28714d; background: #e9f5ec; color: #205e40; }
+.contribution-status-filters button span { color: inherit; font-size: 12px; font-variant-numeric: tabular-nums; opacity: .75; }
 .contribution-project-list,.portfolio-project-list { display: grid; gap: 16px; }
 .contribution-project-card,.portfolio-project-card { background: #fff; border: 1px solid #e0e5e1; border-radius: 16px; overflow: hidden; }
 .contribution-project-card > header,.portfolio-project-card > header { display: grid; grid-template-columns: 52px minmax(0,1fr) auto auto; align-items: center; gap: 16px; padding: 22px 24px; }

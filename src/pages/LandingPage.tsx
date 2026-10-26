@@ -20,7 +20,7 @@ export function LandingPage() {
           <span>GitHub Contribution Portfolio</span>
           <h1>흩어진 오픈소스 기여를<br /><strong>하나의 링크로.</strong></h1>
           <p>내가 만든 Pull Request를 자동으로 모아 프로젝트별로 정리하고,<br />보여주고 싶은 기여만 골라 간편하게 공유하세요.</p>
-          <button type="button" onClick={() => navigate("/mypage")}><Icons.Github className="w-5 h-5" />GitHub로 시작하기</button>
+          <button type="button" onClick={() => navigate("/contributions")}><Icons.Github className="w-5 h-5" />GitHub로 시작하기</button>
           <small>공개 저장소의 PR만 사용하며 비공개 저장소 권한은 요청하지 않습니다.</small>
         </section>
         <section className="contribution-landing-preview" aria-label="프로젝트별 기여 포트폴리오 예시">
