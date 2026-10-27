@@ -5,13 +5,15 @@ import { getRepoVisual } from "../data/content";
 import type { WorkspaceItem } from "../services/userWorkspace";
 import type { AuthUser } from "../services/auth";
 import type { IgnoredPullRequest } from "../services/workspace";
+import { portfolioStatusFilters } from "../../shared/publicPortfolio";
+import type { PortfolioStatusFilter } from "../../shared/publicPortfolio";
 
 type MyPageProps = {
   user: AuthUser;
   items: Record<string, WorkspaceItem>;
   onOpen: (item: WorkspaceItem) => void;
   onOpenPortfolio: () => void;
-  onSharePortfolio: () => void;
+  onSharePortfolio: (statuses: PortfolioStatusFilter[]) => void;
   portfolioCopied: boolean;
   portfolioShareLoading: boolean;
   pullRequestSyncLoading: boolean;
@@ -97,6 +99,12 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
   updatingRepository, onHideRepository, onRestoreRepository }: MyPageProps) => {
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(() => new Set());
   const [statusFilter, setStatusFilter] = useState<PullRequestFilter>("all");
+  const [shareStatuses, setShareStatuses] = useState<PortfolioStatusFilter[]>(["merged"]);
+  const [lastSharedStatuses, setLastSharedStatuses] = useState("");
+  const shareStatusKey = [...shareStatuses].sort().join(",");
+  const selectedPortfolioCopied = portfolioCopied && shareStatusKey === lastSharedStatuses;
+  const individualShareOptions = portfolioStatusFilters.filter(option => option.value !== "all");
+  const allShareStatusesSelected = individualShareOptions.every(option => shareStatuses.includes(option.value));
   const repositories = useMemo(() => groupPullRequests(items), [items]);
   const visibleRepositories = useMemo(() => groupPullRequests(items, statusFilter), [items, statusFilter]);
   const ignoredRepositories = useMemo(() => {
@@ -141,10 +149,27 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
           <div><strong>{mergedCount}</strong><span>병합된 PR</span></div>
           <div><strong>{openCount}</strong><span>진행 중 PR</span></div>
         </div>
-        <button type="button" className="mypage-portfolio-share-button" onClick={onSharePortfolio} disabled={portfolioShareLoading}>
-          {portfolioCopied ? <Icons.Check className="w-4 h-4" /> : <Icons.Clipboard className="w-4 h-4" />}
-          {portfolioShareLoading ? "공유본 만드는 중" : portfolioCopied ? "링크 복사됨" : "포트폴리오 공유"}
-        </button>
+        <div className="portfolio-share-controls">
+          <fieldset disabled={portfolioShareLoading} className="portfolio-share-statuses">
+            <legend>공유할 PR 상태</legend>
+            {portfolioStatusFilters.map(option => <label key={option.value}>
+              <input type="checkbox"
+                checked={option.value === "all" ? allShareStatusesSelected : shareStatuses.includes(option.value)}
+                onChange={event => {
+                  const checked = event.target.checked;
+                  setShareStatuses(current => option.value === "all"
+                    ? checked ? individualShareOptions.map(status => status.value) : []
+                    : checked ? [...current, option.value] : current.filter(status => status !== option.value));
+                }} />
+              {option.label}
+            </label>)}
+          </fieldset>
+          <button type="button" className="mypage-portfolio-share-button" onClick={() => { setLastSharedStatuses(shareStatusKey); onSharePortfolio(shareStatuses); }} disabled={portfolioShareLoading || shareStatuses.length === 0}>
+            {selectedPortfolioCopied ? <Icons.Check className="w-4 h-4" /> : <Icons.Clipboard className="w-4 h-4" />}
+            {portfolioShareLoading ? "공유본 만드는 중" : selectedPortfolioCopied ? "링크 복사됨" : "포트폴리오 공유"}
+          </button>
+          {shareStatuses.length === 0 ? <small>공유할 상태를 하나 이상 선택해 주세요.</small> : null}
+        </div>
       </section>
 
       <section className="mypage-pr-sync contribution-sync" aria-labelledby="sync-title">

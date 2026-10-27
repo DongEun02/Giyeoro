@@ -4,6 +4,8 @@ import { getDatabase } from "./database.js";
 import type { Database } from "./database.js";
 import { readGithubSessionUser } from "./githubAuthService.js";
 import type { GithubAuthOptions, GithubUser } from "./githubAuthService.js";
+import { isPortfolioStatusFilter } from "../shared/publicPortfolio.js";
+import type { PortfolioStatusFilter } from "../shared/publicPortfolio.js";
 
 type PublicPortfolioOptions = GithubAuthOptions & {
   databaseUrl?: string;
@@ -100,11 +102,16 @@ const safeHttpsUrl = (value: unknown, allowedHost?: string) => {
 export const isValidPortfolioLogin = (value: string) => /^[A-Za-z0-9-]{1,39}$/.test(value);
 export const isValidPortfolioSnapshotId = (value: string) => /^[A-Za-z0-9_-]{24}$/.test(value);
 
-export const isPublicPortfolioItem = ({ kind, status, data }: PortfolioVisibilityCandidate) => {
-  if (status !== "completed") return false;
+export const isPublicPortfolioItem = ({ kind, status, data }: PortfolioVisibilityCandidate, filter: PortfolioStatusFilter | readonly PortfolioStatusFilter[] = "merged") => {
+  if (status !== "completed" && status !== "in_progress") return false;
   if (kind !== "pull_request") return false;
   const itemData = object(data);
-  return itemData.merged === true && nonNegativeInteger(itemData.repositoryStars) >= 50;
+  if (itemData.merged === true && status !== "completed") return false;
+  const state = itemData.merged === true ? "merged" : itemData.state;
+  const filters = typeof filter === "string" ? [filter] : filter;
+  if (!filters.some(value => value === "all" || value === state)) return false;
+  return (itemData.merged === true || itemData.state === "open" || itemData.state === "closed")
+    && nonNegativeInteger(itemData.repositoryStars) >= 50;
 };
 
 const mapPortfolioItem = (row: PortfolioItemRow) => {
@@ -113,6 +120,8 @@ const mapPortfolioItem = (row: PortfolioItemRow) => {
   const kind = row.kind as "issue" | "pull_request";
   const mergedAt = kind === "pull_request" ? isoDate(data.mergedAt, "") : "";
   const author = object(data.author);
+  const state = data.merged === true ? "merged" : data.state === "closed" ? "closed" : "open";
+  const closedAt = isoDate(data.closedAt, "");
 
   return {
     id: text(row.item_id, 300),
@@ -126,14 +135,15 @@ const mapPortfolioItem = (row: PortfolioItemRow) => {
       ? row.language_tags.map(tag => text(tag, 50)).filter(Boolean).slice(0, 8)
       : [],
     url: safeHttpsUrl(row.url, "github.com"),
-    completedAt: mergedAt || updatedAt,
+    completedAt: mergedAt || closedAt || updatedAt,
     repositoryAvatarUrl: safeHttpsUrl(data.repositoryAvatarUrl),
     number: nonNegativeInteger(data.number),
     ...(kind === "pull_request" ? {
       additions: nonNegativeInteger(data.additions),
       deletions: nonNegativeInteger(data.deletions),
       changedFiles: nonNegativeInteger(data.changedFiles),
-      mergedAt: mergedAt || updatedAt,
+      state,
+      mergedAt: state === "merged" ? mergedAt || updatedAt : undefined,
       authorLogin: text(author.login, 100)
     } : {})
   };
@@ -143,20 +153,19 @@ const resolveDatabaseUrl = (options: PublicPortfolioOptions) => (
   options.databaseUrl || process.env.DATABASE_URL || ""
 ).trim();
 
-const listPublicPortfolioItems = async (database: Database, userId: number | string) => {
+const listPublicPortfolioItems = async (database: Database, userId: number | string, filter: readonly PortfolioStatusFilter[] = ["merged"]) => {
   const itemResult = await database.execute<PortfolioItemRow>(sql`
     SELECT item_id, kind, status, repo, title, summary, difficulty, work_type,
       language_tags, url, data, updated_at
     FROM workspace_items
     WHERE user_id = ${userId}
       AND kind = 'pull_request'
-      AND status = 'completed'
-      AND COALESCE(data ->> 'merged', 'false') = 'true'
+      AND status IN ('completed', 'in_progress')
     ORDER BY updated_at DESC
   `);
 
   return itemResult.rows
-    .filter(isPublicPortfolioItem)
+    .filter(item => isPublicPortfolioItem(item, filter))
     .map(mapPortfolioItem);
 };
 
@@ -173,14 +182,14 @@ const portfolioFromUser = async (
   items: await listPublicPortfolioItems(database, user.github_id)
 });
 
-const portfolioFromSessionUser = async (database: Database, user: GithubUser): Promise<PublicPortfolio> => ({
+const portfolioFromSessionUser = async (database: Database, user: GithubUser, filter: readonly PortfolioStatusFilter[]): Promise<PublicPortfolio> => ({
   profile: {
     login: text(user.login, 39),
     name: text(user.name, 200, user.login),
     avatarUrl: safeHttpsUrl(user.avatarUrl),
     profileUrl: safeHttpsUrl(user.profileUrl, "github.com")
   },
-  items: await listPublicPortfolioItems(database, user.id)
+  items: await listPublicPortfolioItems(database, user.id, filter)
 });
 
 export const handlePublicPortfolioRequest = async (
@@ -241,6 +250,13 @@ export const handlePublicPortfolioSnapshotRequest = async (
       return jsonResponse(response, 401, { error: "GitHub 로그인이 필요합니다." }, "no-store");
     }
 
+    const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
+    const requestedStatuses = requestUrl.searchParams.getAll("status");
+    const filter = requestedStatuses.length ? requestedStatuses : ["merged"];
+    if (!filter.every(isPortfolioStatusFilter)) {
+      return jsonResponse(response, 400, { error: "공유할 PR 상태가 올바르지 않습니다." }, "no-store");
+    }
+
     try {
       const database = getDatabase(databaseUrl);
       const snapshotId = randomBytes(18).toString("base64url");
@@ -254,7 +270,7 @@ export const handlePublicPortfolioSnapshotRequest = async (
           profile_url = EXCLUDED.profile_url,
           updated_at = NOW()
       `);
-      const snapshot = await portfolioFromSessionUser(database, user);
+      const snapshot = await portfolioFromSessionUser(database, user, filter);
       await database.execute(sql`
         INSERT INTO public_portfolio_snapshots (snapshot_id, owner_id, snapshot)
         VALUES (${snapshotId}, ${user.id}, ${JSON.stringify(snapshot)}::jsonb)

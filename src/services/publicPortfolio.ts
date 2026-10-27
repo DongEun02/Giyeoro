@@ -1,3 +1,5 @@
+import type { PortfolioStatusFilter } from "../../shared/publicPortfolio";
+
 export type PublicPortfolioProfile = {
   login: string;
   name: string;
@@ -22,6 +24,7 @@ export type PublicPortfolioItem = {
   deletions?: number;
   changedFiles?: number;
   mergedAt?: string;
+  state?: "merged" | "open" | "closed";
   authorLogin?: string;
 };
 
@@ -51,8 +54,11 @@ export const fetchPublicPortfolio = async (
   return data as PublicPortfolio;
 };
 
-export const createPublicPortfolioSnapshot = async (): Promise<string> => {
-  const response = await fetch("/api/workspace?operation=portfolio-snapshot", {
+export const createPublicPortfolioSnapshot = async (statuses: PortfolioStatusFilter[] = ["merged"]): Promise<string> => {
+  if (!statuses.length) throw new Error("공유할 PR 상태를 하나 이상 선택해 주세요.");
+  const parameters = new URLSearchParams({ operation: "portfolio-snapshot" });
+  statuses.forEach(status => parameters.append("status", status));
+  const response = await fetch(`/api/workspace?${parameters}`, {
     method: "POST",
     headers: { Accept: "application/json" }
   });

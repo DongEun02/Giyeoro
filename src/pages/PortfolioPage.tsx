@@ -80,12 +80,12 @@ export function PortfolioPage({ snapshot = false }: PortfolioPageProps) {
           </a>
           <div><span>Open Source Contributions</span><h1 id="portfolio-title">{profile.name}의 오픈소스 기여</h1><a href={profile.profileUrl || undefined} target="_blank" rel="noreferrer">@{profile.login}<Icons.ArrowRight className="w-3.5 h-3.5" /></a></div>
         </div>
-        <p className="portfolio-disclosure">{snapshot ? "공유 시점의 병합된 Pull Request를 그대로 보여주는 포트폴리오입니다." : "GitHub에서 병합이 확인된 Pull Request를 프로젝트별로 정리했습니다."}</p>
+        <p className="portfolio-disclosure">{snapshot ? "공유 시점에 선택한 Pull Request를 그대로 보여주는 포트폴리오입니다." : "GitHub에서 병합이 확인된 Pull Request를 프로젝트별로 정리했습니다."}</p>
       </section>
 
       <section className="portfolio-stats" aria-label="공개 기여 요약">
         <div><strong>{repositories.length}</strong><span>기여 프로젝트</span></div>
-        <div><strong>{items.length}</strong><span>병합된 PR</span></div>
+        <div><strong>{items.length}</strong><span>{items.every(item => !item.state || item.state === "merged") ? "병합된 PR" : "공유된 PR"}</span></div>
         <div><strong>+{totalAdditions.toLocaleString()}</strong><span>추가한 코드</span></div>
         <div><strong>{new Set(items.flatMap(item => item.languageTags)).size}</strong><span>사용 언어</span></div>
       </section>
@@ -97,10 +97,10 @@ export function PortfolioPage({ snapshot = false }: PortfolioPageProps) {
           const visibleItems = expanded ? project.items : project.items.slice(0, 3);
           return <article className="portfolio-project-card" key={project.repo}>
             <header><img src={project.avatarUrl || getRepoVisual(project.repo).image} alt="" referrerPolicy="no-referrer" /><div><span>{project.languages.join(" · ") || "Open Source"}</span><h3>{project.repo}</h3><p>{project.items.length}개의 PR · 변경 파일 {project.changedFiles}개 · 최근 {dateFormatter.format(new Date(project.latestAt))}</p></div><div className="portfolio-project-diff" aria-label={`추가 ${project.additions.toLocaleString()}줄, 삭제 ${project.deletions.toLocaleString()}줄`}><span className="portfolio-additions">+{project.additions.toLocaleString()}</span><span className="portfolio-deletions">-{project.deletions.toLocaleString()}</span></div></header>
-            <div className="portfolio-project-prs">{visibleItems.map(item => <a href={item.url || undefined} target="_blank" rel="noreferrer" key={item.id}><span>Merged</span><strong>{item.title}</strong><small>#{item.number} · {dateFormatter.format(new Date(item.completedAt))}</small><Icons.ArrowRight className="w-4 h-4" /></a>)}</div>
+            <div className="portfolio-project-prs">{visibleItems.map(item => <a href={item.url || undefined} target="_blank" rel="noreferrer" key={item.id}><span className={`is-${item.state || "merged"}`}>{item.state === "open" ? "Open" : item.state === "closed" ? "Closed" : "Merged"}</span><strong>{item.title}</strong><small>#{item.number} · {dateFormatter.format(new Date(item.completedAt))}</small><Icons.ArrowRight className="w-4 h-4" /></a>)}</div>
             {project.items.length > 3 ? <button type="button" onClick={() => toggleRepository(project.repo)}>{expanded ? "대표 PR만 보기" : `전체 PR ${project.items.length}개 보기`}</button> : null}
           </article>;
-        })}</div> : <div className="portfolio-empty"><Icons.GitPullRequest className="w-5 h-5" /><strong>아직 공개할 병합 PR이 없습니다.</strong><p>병합된 오픈소스 PR이 생기면 프로젝트별로 표시됩니다.</p></div>}
+        })}</div> : <div className="portfolio-empty"><Icons.GitPullRequest className="w-5 h-5" /><strong>{snapshot ? "공유된 PR이 없습니다." : "아직 공개할 병합 PR이 없습니다."}</strong><p>{snapshot ? "공유 시점에 선택한 상태의 PR이 없습니다." : "병합된 오픈소스 PR이 생기면 프로젝트별로 표시됩니다."}</p></div>}
       </section>
     </div>
   );

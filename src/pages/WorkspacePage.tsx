@@ -6,6 +6,7 @@ import { useOssApp } from "../app/OssAppContext";
 import type { IgnoredPullRequest, PullRequestSyncResult } from "../services/workspace";
 import { hideRemoteRepository, restoreIgnoredRepository } from "../services/workspace";
 import { createPublicPortfolioSnapshot } from "../services/publicPortfolio";
+import type { PortfolioStatusFilter } from "../../shared/publicPortfolio";
 
 const EMPTY_SYNC_RESULT = {
   syncedAt: "",
@@ -46,12 +47,12 @@ export function WorkspacePage() {
     ? `/portfolio/${encodeURIComponent(authUser.login)}`
     : "/contributions";
 
-  const handlePortfolioShare = async () => {
+  const handlePortfolioShare = async (statuses: PortfolioStatusFilter[]) => {
     if (portfolioShareLoading) return;
     setPortfolioShareLoading(true);
     setPortfolioCopied(false);
     try {
-      const snapshotId = await createPublicPortfolioSnapshot();
+      const snapshotId = await createPublicPortfolioSnapshot(statuses);
       const shareUrl = new URL(`/share/${encodeURIComponent(snapshotId)}`, window.location.origin).toString();
       await navigator.clipboard.writeText(shareUrl);
       setPortfolioCopied(true);
