@@ -3,9 +3,40 @@ import test from "node:test";
 import {
   fetchAuthoredPullRequests,
   fetchAuthoredPullRequestHistoryPage,
+  fetchIgnoredPullRequestsToRestore,
   isEligibleContributionPullRequest,
   selectPullRequestsToSync
 } from "./githubPullRequestSyncService.js";
+
+const restoreUser = { id: 1, login: "contributor", name: "Contributor", avatarUrl: "", profileUrl: "" };
+
+test("숨긴 과거 PR과 병합 없이 닫힌 PR을 주소로 직접 복구한다", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    assert.equal(body.variables.number0, 12);
+    assert.equal(body.variables.repo0, "library");
+    return Response.json({ data: { pr0: { pullRequest: contribution({ state: "CLOSED", merged: false }) } } });
+  };
+  const [restored] = await fetchIgnoredPullRequestsToRestore([
+    { item_id: "github-pr-opensource/library-12", url: "https://github.com/opensource/library/pull/12" }
+  ], restoreUser, "token");
+  assert.equal(restored.id, "github-pr-opensource/library-12");
+  assert.equal(restored.difficulty, "닫힘");
+  assert.equal(restored.data.state, "closed");
+});
+
+test("복구할 PR이 없거나 GitHub 조회에 실패하면 복구를 실패 처리한다", async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const ignored = [{ item_id: "github-pr-opensource/library-12", url: "https://github.com/opensource/library/pull/12" }];
+  for (const response of [Response.json({ data: { pr0: null } }), new Response("", { status: 503 }),
+    Response.json({ data: { pr0: { pullRequest: contribution({ author: { login: "another-user" } }) } } })]) {
+    globalThis.fetch = async () => response;
+    await assert.rejects(fetchIgnoredPullRequestsToRestore(ignored, restoreUser, "token"), /RESTORE_FAILED/);
+  }
+});
 
 const contribution = (overrides: Record<string, unknown> = {}) => ({
   number: 12,

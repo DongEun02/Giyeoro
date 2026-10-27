@@ -78,6 +78,18 @@ export const hideRemoteRepository = async (repo: string) => {
   }, "프로젝트를 공개 목록에서 숨기지 못했습니다.");
 };
 
+export const fetchWorkspaceItems = async (signal?: AbortSignal) => {
+  const result = await request<WorkspaceItemsResponse>("/api/workspace", { method: "GET", signal }, "작업 목록을 불러오지 못했습니다.");
+  return result.items;
+};
+
+export const fetchIgnoredPullRequests = async (signal?: AbortSignal) => {
+  const result = await request<{ ignoredItems: IgnoredPullRequest[] }>(
+    "/api/workspace?operation=sync-pull-requests", { method: "GET", signal }, "숨긴 프로젝트를 불러오지 못했습니다."
+  );
+  return result.ignoredItems;
+};
+
 export const syncRemoteGithubPullRequests = async (
   force = false,
   signal?: AbortSignal

@@ -8,6 +8,7 @@ import {
   upsertWorkspaceUser
 } from "./workspaceService.js";
 import type { WorkspaceItem } from "./workspaceService.js";
+import { parseGithubPullRequestUrl } from "./githubPullRequestService.js";
 
 type PullRequestSyncOptions = GithubAuthOptions & {
   databaseUrl?: string;
@@ -294,6 +295,45 @@ const githubHeaders = (githubToken: string) => ({
   "X-GitHub-Api-Version": GITHUB_API_VERSION
 });
 
+export const fetchIgnoredPullRequestsToRestore = async (
+  ignoredItems: { item_id: string; url: string | null }[],
+  user: GithubUser,
+  githubToken: string
+): Promise<WorkspaceItem[]> => {
+  const restored: WorkspaceItem[] = [];
+  for (let offset = 0; offset < ignoredItems.length; offset += 20) {
+    const batch = ignoredItems.slice(offset, offset + 20);
+    const variables: Record<string, string | number> = {};
+    const definitions: string[] = [];
+    const fields = batch.map((item, index) => {
+      const parsed = parseGithubPullRequestUrl(item.url);
+      if (!parsed) throw new Error("RESTORE_FAILED");
+      definitions.push(`$owner${index}: String!`, `$repo${index}: String!`, `$number${index}: Int!`);
+      variables[`owner${index}`] = parsed.owner;
+      variables[`repo${index}`] = parsed.repo;
+      variables[`number${index}`] = parsed.number;
+      return `pr${index}: repository(owner: $owner${index}, name: $repo${index}) { pullRequest(number: $number${index}) { ...PullRequestFields } }`;
+    });
+    const response = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: githubHeaders(githubToken),
+      body: JSON.stringify({ query: `query RestorePullRequests(${definitions.join(",")}) { ${fields.join(" ")} } ${PULL_REQUEST_FIELDS}`, variables }),
+      signal: AbortSignal.timeout(25_000)
+    });
+    if (!response.ok) throw new Error("RESTORE_FAILED");
+    const payload = await response.json() as { errors?: unknown[]; data?: Record<string, { pullRequest?: PullRequestNode } | null> };
+    if (payload.errors?.length) throw new Error("RESTORE_FAILED");
+    for (const [index, ignored] of batch.entries()) {
+      const node = payload.data?.[`pr${index}`]?.pullRequest;
+      if (!node || node.repository?.isPrivate !== false
+        || node.author?.login?.toLowerCase() !== user.login.toLowerCase()
+        || itemId(node) !== ignored.item_id) throw new Error("RESTORE_FAILED");
+      restored.push(mapPullRequestItem(node));
+    }
+  }
+  return restored;
+};
+
 const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 const fetchGithubPullRequestPage = async (
@@ -418,6 +458,10 @@ export const handleGithubPullRequestSyncRequest = async (
   try {
     await upsertWorkspaceUser(database, user);
 
+    if (request.method === "GET") {
+      return jsonResponse(response, 200, { ignoredItems: await listIgnoredItems(database, user.id) });
+    }
+
     if (request.method === "PATCH") {
       const body = request.body && typeof request.body === "object"
         ? request.body
@@ -433,22 +477,33 @@ export const handleGithubPullRequestSyncRequest = async (
       const id = text(body.id, 300);
       const repo = text(body.repo, 300);
       if (!id && !repo) return jsonResponse(response, 400, { error: "복구할 PR 또는 프로젝트가 올바르지 않습니다." });
-      if (repo) {
-        await database.execute(sql`
-          DELETE FROM workspace_ignored_items
-          WHERE user_id = ${user.id} AND LOWER(repo) = LOWER(${repo}) AND kind = 'pull_request'
-        `);
-      } else {
-        await database.execute(sql`
-          DELETE FROM workspace_ignored_items
-          WHERE user_id = ${user.id} AND item_id = ${id} AND kind = 'pull_request'
-        `);
+      const ignored = await database.execute<IgnoredItemRow>(sql`
+        SELECT item_id, repo, title, url, ignored_at FROM workspace_ignored_items
+        WHERE user_id = ${user.id} AND kind = 'pull_request'
+          AND ${repo ? sql`LOWER(repo) = LOWER(${repo})` : sql`item_id = ${id}`}
+      `);
+      const token = (options.githubToken || process.env.GITHUB_TOKEN || "").trim();
+      if (!token) return jsonResponse(response, 503, { error: "프로젝트 복구를 위한 GitHub 토큰이 설정되지 않았습니다." });
+      let restored: WorkspaceItem[];
+      try {
+        restored = await fetchIgnoredPullRequestsToRestore(ignored.rows, user, token);
+      } catch {
+        return jsonResponse(response, 502, { error: "GitHub에서 복구할 PR을 불러오지 못했습니다. 숨김 상태는 유지됩니다. 잠시 후 다시 시도해 주세요." });
       }
+      await database.transaction(async transaction => {
+        for (const item of restored) {
+          await upsertWorkspaceItem(transaction, user.id, item);
+          await transaction.execute(sql`
+            DELETE FROM workspace_ignored_items
+            WHERE user_id = ${user.id} AND item_id = ${item.id} AND kind = 'pull_request'
+          `);
+        }
+      });
       return jsonResponse(response, 200, { ok: true });
     }
 
     if (request.method !== "POST") {
-      response.setHeader("Allow", "POST, PATCH");
+      response.setHeader("Allow", "GET, POST, PATCH");
       return jsonResponse(response, 405, { error: "지원하지 않는 요청 방식입니다." });
     }
 

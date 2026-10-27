@@ -19,7 +19,7 @@ import {
   readLegacyWorkspaceItems
 } from "./services/userWorkspace";
 import type { WorkspaceItem } from "./services/userWorkspace";
-import { syncRemoteGithubPullRequests, syncWorkspaceItems } from "./services/workspace";
+import { fetchWorkspaceItems, syncRemoteGithubPullRequests, syncWorkspaceItems } from "./services/workspace";
 
 export default function App() {
   const location = useLocation();
@@ -134,8 +134,14 @@ export default function App() {
   const syncGithubPullRequests = async (force = false, signal?: AbortSignal) => {
     if (!authUser) throw new Error("GitHub 로그인이 필요합니다.");
     const result = await syncRemoteGithubPullRequests(force, signal);
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     setTrackedTasks(indexWorkspaceItems(result.items));
     return result;
+  };
+
+  const refreshWorkspaceItems = async () => {
+    const items = await fetchWorkspaceItems();
+    setTrackedTasks(indexWorkspaceItems(items));
   };
 
   const openWorkspaceItem = (item: WorkspaceItem) => {
@@ -150,6 +156,7 @@ export default function App() {
     workspaceError,
     trackedTasks,
     syncGithubPullRequests,
+    refreshWorkspaceItems,
     openWorkspaceItem,
     triggerToast
   };

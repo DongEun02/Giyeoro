@@ -4,7 +4,7 @@ import { MyPage } from "../components/MyPage";
 import { MyPageLoginGate } from "../components/MyPageLoginGate";
 import { useOssApp } from "../app/OssAppContext";
 import type { IgnoredPullRequest, PullRequestSyncResult } from "../services/workspace";
-import { hideRemoteRepository, restoreIgnoredRepository } from "../services/workspace";
+import { fetchIgnoredPullRequests, hideRemoteRepository, restoreIgnoredRepository } from "../services/workspace";
 import { createPublicPortfolioSnapshot } from "../services/publicPortfolio";
 import type { PortfolioStatusFilter } from "../../shared/publicPortfolio";
 
@@ -25,6 +25,8 @@ export function WorkspacePage() {
   const [pullRequestSyncError, setPullRequestSyncError] = useState("");
   const [pullRequestSyncResult, setPullRequestSyncResult] = useState(() => EMPTY_SYNC_RESULT);
   const [updatingRepository, setUpdatingRepository] = useState("");
+  const [ignoredPullRequests, setIgnoredPullRequests] = useState<IgnoredPullRequest[]>([]);
+  const ignoredRequestVersion = useRef(0);
   const [portfolioCopied, setPortfolioCopied] = useState(false);
   const [portfolioShareLoading, setPortfolioShareLoading] = useState(false);
   const {
@@ -34,6 +36,7 @@ export function WorkspacePage() {
     workspaceError,
     trackedTasks,
     syncGithubPullRequests,
+    refreshWorkspaceItems,
     openWorkspaceItem,
     triggerToast
   } = useOssApp();
@@ -75,6 +78,22 @@ export function WorkspacePage() {
       ignoredItems: result.ignoredItems
     });
   }, []);
+
+  const refreshIgnoredPullRequests = useCallback(async (signal?: AbortSignal) => {
+    const version = ++ignoredRequestVersion.current;
+    const items = await fetchIgnoredPullRequests(signal);
+    if (!signal?.aborted && version === ignoredRequestVersion.current) setIgnoredPullRequests(items);
+  }, []);
+
+  useEffect(() => {
+    if (authLoading || !authUser) return;
+    const controller = new AbortController();
+    setIgnoredPullRequests([]);
+    void refreshIgnoredPullRequests(controller.signal).catch(error => {
+      if (!controller.signal.aborted) setPullRequestSyncError(error instanceof Error ? error.message : "숨긴 프로젝트를 불러오지 못했습니다.");
+    });
+    return () => controller.abort();
+  }, [authLoading, authUser?.login, refreshIgnoredPullRequests]);
 
   const runPullRequestSync = useCallback(async (
     force: boolean,
@@ -139,10 +158,11 @@ export function WorkspacePage() {
     if (updatingRepository) return;
     setUpdatingRepository(repo);
     setPullRequestSyncError("");
+    syncControllerRef.current?.abort();
+    setPullRequestSyncLoading(false);
     try {
       await hideRemoteRepository(repo);
-      const result = await syncGithubPullRequests(false) as PullRequestSyncResult;
-      applySyncResult(result);
+      await Promise.all([refreshWorkspaceItems(), refreshIgnoredPullRequests()]);
       triggerToast(`'${repo}' 프로젝트를 공개 목록에서 숨겼습니다.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "프로젝트를 숨기지 못했습니다.";
@@ -157,10 +177,11 @@ export function WorkspacePage() {
     if (updatingRepository) return;
     setUpdatingRepository(repo);
     setPullRequestSyncError("");
+    syncControllerRef.current?.abort();
+    setPullRequestSyncLoading(false);
     try {
       await restoreIgnoredRepository(repo);
-      const result = await syncGithubPullRequests(true) as PullRequestSyncResult;
-      applySyncResult(result);
+      await Promise.all([refreshWorkspaceItems(), refreshIgnoredPullRequests()]);
       triggerToast(`'${repo}' 프로젝트를 다시 공개 목록에 추가했습니다.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "프로젝트를 복구하지 못했습니다.";
@@ -212,7 +233,7 @@ export function WorkspacePage() {
         pullRequestImportedCount={pullRequestSyncResult.importedCount}
         pullRequestScannedCount={pullRequestSyncResult.scannedCount}
         pullRequestSyncTruncated={pullRequestSyncResult.truncated}
-        ignoredPullRequests={pullRequestSyncResult.ignoredItems}
+        ignoredPullRequests={ignoredPullRequests}
         onPullRequestSync={() => runPullRequestSync(!pullRequestSyncResult.truncated, true)}
         updatingRepository={updatingRepository}
         onHideRepository={handleHideRepository}
