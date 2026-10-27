@@ -5,6 +5,7 @@ import {
   fetchAuthoredPullRequestHistoryPage,
   fetchIgnoredPullRequestsToRestore,
   isEligibleContributionPullRequest,
+  selectMissingPullRequestsToRecover,
   selectPullRequestsToSync
 } from "./githubPullRequestSyncService.js";
 
@@ -53,6 +54,34 @@ const contribution = (overrides: Record<string, unknown> = {}) => ({
     owner: { login: "opensource" }
   },
   ...overrides
+});
+
+test("과거 복구는 기존 PR과 숨긴 저장소를 유지하고 누락된 닫힌 PR도 가져온다", () => {
+  const closed = contribution({ number: 14, state: "CLOSED", merged: false });
+  const existing = contribution({ number: 12 });
+  const hidden = contribution({ number: 13, repository: { ...contribution().repository, nameWithOwner: "hidden/library" } });
+  const nodes = [closed, existing, hidden, closed];
+  const recovered = selectMissingPullRequestsToRecover(nodes, "contributor", new Set(["github-pr-opensource/library-12"]), [
+    { item_id: "github-pr-hidden/library-1", repo: "HIDDEN/Library" }
+  ]);
+  assert.deepEqual(recovered.map(item => item.id), ["github-pr-opensource/library-14"]);
+  assert.equal(recovered[0].difficulty, "닫힘");
+  assert.deepEqual(selectMissingPullRequestsToRecover(nodes, "contributor", new Set(recovered.map(item => item.id)), [
+    { item_id: "github-pr-opensource/library-12", repo: "opensource/library" },
+    { item_id: "github-pr-hidden/library-1", repo: "hidden/library" }
+  ]), []);
+});
+
+test("과거 복구에서도 다른 사람·비공개·자기 저장소·스타 50개 미만 PR은 제외한다", () => {
+  const nodes = [
+    contribution({ state: "CLOSED", author: { login: "someone-else" } }),
+    contribution({ state: "CLOSED", repository: { ...contribution().repository, isPrivate: true } }),
+    contribution({ state: "CLOSED", repository: { ...contribution().repository, owner: { login: "contributor" } } }),
+    contribution({ state: "CLOSED", repository: { ...contribution().repository, stargazerCount: 49 } })
+  ];
+  for (const node of nodes) {
+    assert.deepEqual(selectMissingPullRequestsToRecover([node], "contributor", new Set(), []), []);
+  }
 });
 
 test("스타 50개 이상인 공개 외부 저장소의 작성 PR을 허용한다", () => {

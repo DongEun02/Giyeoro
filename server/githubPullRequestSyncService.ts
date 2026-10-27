@@ -201,13 +201,15 @@ const itemId = (pullRequest: PullRequestNode) => {
 
 export const isEligibleContributionPullRequest = (
   pullRequest: PullRequestNode,
-  githubLogin: string
+  githubLogin: string,
+  includeClosed = false
 ) => {
   const repository = pullRequest.repository;
   const authorLogin = text(pullRequest.author?.login, 100).toLowerCase();
   const ownerLogin = text(repository?.owner?.login, 100).toLowerCase();
   const login = githubLogin.toLowerCase();
-  const activeContribution = pullRequest.merged === true || pullRequest.state === "OPEN";
+  const activeContribution = pullRequest.merged === true || pullRequest.state === "OPEN"
+    || (includeClosed && pullRequest.state === "CLOSED");
 
   return Boolean(
     itemId(pullRequest)
@@ -286,6 +288,21 @@ export const selectPullRequestsToSync = (
   .filter(node => isEligibleContributionPullRequest(node, githubLogin)
     || (node.state === "CLOSED" && node.merged !== true && existingIds.has(itemId(node))))
   .map(mapPullRequestItem);
+
+export const selectMissingPullRequestsToRecover = (
+  nodes: PullRequestNode[],
+  githubLogin: string,
+  existingIds: Set<string>,
+  ignored: { item_id: string; repo: string }[]
+) => {
+  const ignoredIds = new Set(ignored.map(item => item.item_id));
+  const ignoredRepos = new Set(ignored.map(item => item.repo.toLowerCase()));
+  return [...new Map(nodes.map(node => [itemId(node), node])).values()]
+    .filter(node => isEligibleContributionPullRequest(node, githubLogin, true))
+    .filter(node => !existingIds.has(itemId(node)) && !ignoredIds.has(itemId(node))
+      && !ignoredRepos.has(text(node.repository?.nameWithOwner, 300).toLowerCase()))
+    .map(mapPullRequestItem);
+};
 
 const githubHeaders = (githubToken: string) => ({
   Accept: "application/vnd.github+json",
