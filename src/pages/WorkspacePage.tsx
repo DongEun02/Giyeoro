@@ -40,7 +40,6 @@ export function WorkspacePage() {
     portfolioStatuses,
     setPortfolioStatuses,
     portfolioPath,
-    openWorkspaceItem,
     triggerToast
   } = useOssApp();
   const syncGithubPullRequestsRef = useRef(syncGithubPullRequests);
@@ -220,7 +219,6 @@ export function WorkspacePage() {
       <MyPage
         user={authUser}
         items={trackedTasks}
-        onOpen={openWorkspaceItem}
         onOpenPortfolio={() => navigate(portfolioPath)}
         onSharePortfolio={handlePortfolioShare}
         portfolioStatuses={portfolioStatuses}

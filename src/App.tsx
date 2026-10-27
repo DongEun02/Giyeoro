@@ -156,11 +156,6 @@ export default function App() {
     setTrackedTasks(indexWorkspaceItems(items));
   };
 
-  const openWorkspaceItem = (item: WorkspaceItem) => {
-    if (!item.url) return;
-    window.open(item.url, "_blank", "noopener,noreferrer");
-  };
-
   const contextValue = {
     authUser,
     authLoading,
@@ -172,7 +167,6 @@ export default function App() {
     portfolioStatuses,
     setPortfolioStatuses,
     portfolioPath,
-    openWorkspaceItem,
     triggerToast
   };
 

@@ -11,7 +11,6 @@ import type { PortfolioStatusFilter } from "../../shared/publicPortfolio";
 type MyPageProps = {
   user: AuthUser;
   items: Record<string, WorkspaceItem>;
-  onOpen: (item: WorkspaceItem) => void;
   onOpenPortfolio: () => void;
   onSharePortfolio: (statuses: PortfolioStatusFilter[]) => void;
   portfolioStatuses: PortfolioStatusFilter[];
@@ -95,7 +94,7 @@ const groupPullRequests = (items: Record<string, WorkspaceItem>, filter: PullReq
   ));
 };
 
-export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio, portfolioCopied, portfolioShareLoading,
+export const MyPage = ({ user, items, onOpenPortfolio, onSharePortfolio, portfolioCopied, portfolioShareLoading,
   portfolioStatuses: shareStatuses, onPortfolioStatusesChange: setShareStatuses,
   pullRequestSyncLoading, pullRequestSyncProgress, pullRequestSyncError, pullRequestSyncedAt, pullRequestImportedCount,
   pullRequestScannedCount, pullRequestSyncTruncated, ignoredPullRequests, onPullRequestSync,
@@ -211,7 +210,7 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
               <div className="contribution-project-diff" aria-label={`추가 ${project.additions.toLocaleString()}줄, 삭제 ${project.deletions.toLocaleString()}줄`}><span className="contribution-additions">+{project.additions.toLocaleString()}</span><span className="contribution-deletions">-{project.deletions.toLocaleString()}</span></div>
               <button type="button" className="contribution-hide-button" onClick={() => onHideRepository(project.repo)} disabled={!!updatingRepository}>{updatingRepository === project.repo ? "숨기는 중" : "프로젝트 숨기기"}</button>
             </header>
-            <div className="contribution-pr-list">{visibleItems.map(item => { const state = pullRequestState(item); return <button type="button" className="contribution-pr-row" key={item.id} onClick={() => onOpen(item)}><span className={`is-${state.toLowerCase()}`}>{state}</span><strong>{item.title}</strong><small>#{item.data?.number || ""} · {contributionDateFormatter.format(new Date(item.data?.mergedAt || item.data?.closedAt || item.updatedAt))}</small><Icons.ArrowRight className="w-4 h-4" /></button>; })}</div>
+            <div className="contribution-pr-list">{visibleItems.map(item => { const state = pullRequestState(item); return <a className="contribution-pr-row" key={item.id} href={item.url || undefined} target="_blank" rel="noopener noreferrer"><span className={`is-${state.toLowerCase()}`}>{state}</span><strong>{item.title}</strong><small>#{item.data?.number || ""} · {contributionDateFormatter.format(new Date(item.data?.mergedAt || item.data?.closedAt || item.updatedAt))}</small><Icons.ArrowRight className="w-4 h-4" /></a>; })}</div>
             {project.items.length > 3 ? <button type="button" className="contribution-expand-button" onClick={() => toggleExpanded(project.repo)}>{expanded ? "대표 PR만 보기" : `전체 PR ${project.items.length}개 보기`}</button> : null}
           </article>;
         })}</div> : repositories.length > 0 ? <div className="mypage-empty"><Icons.GitPullRequest className="w-5 h-5" /><strong>해당 상태의 PR이 없습니다.</strong><p>다른 상태를 선택하거나 전체 PR을 확인해 보세요.</p><button type="button" onClick={() => setStatusFilter("all")}>전체 PR 보기</button></div> : <div className="mypage-empty"><Icons.GitPullRequest className="w-5 h-5" /><strong>아직 모은 PR이 없습니다.</strong><p>GitHub 동기화를 실행하면 프로젝트별 기여가 여기에 정리됩니다.</p><button type="button" onClick={onPullRequestSync}>GitHub PR 동기화</button></div>}
