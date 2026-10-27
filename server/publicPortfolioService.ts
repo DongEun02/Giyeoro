@@ -4,7 +4,7 @@ import { getDatabase } from "./database.js";
 import type { Database } from "./database.js";
 import { readGithubSessionUser } from "./githubAuthService.js";
 import type { GithubAuthOptions, GithubUser } from "./githubAuthService.js";
-import { isPortfolioStatusFilter } from "../shared/publicPortfolio.js";
+import { parsePortfolioStatuses } from "../shared/publicPortfolio.js";
 import type { PortfolioStatusFilter } from "../shared/publicPortfolio.js";
 
 type PublicPortfolioOptions = GithubAuthOptions & {
@@ -171,7 +171,8 @@ const listPublicPortfolioItems = async (database: Database, userId: number | str
 
 const portfolioFromUser = async (
   database: Database,
-  user: Pick<PortfolioUserRow, "github_id" | "github_login" | "name" | "avatar_url" | "profile_url">
+  user: Pick<PortfolioUserRow, "github_id" | "github_login" | "name" | "avatar_url" | "profile_url">,
+  filter: readonly PortfolioStatusFilter[]
 ): Promise<PublicPortfolio> => ({
   profile: {
     login: text(user.github_login, 39),
@@ -179,7 +180,7 @@ const portfolioFromUser = async (
     avatarUrl: safeHttpsUrl(user.avatar_url),
     profileUrl: safeHttpsUrl(user.profile_url, "github.com")
   },
-  items: await listPublicPortfolioItems(database, user.github_id)
+  items: await listPublicPortfolioItems(database, user.github_id, filter)
 });
 
 const portfolioFromSessionUser = async (database: Database, user: GithubUser, filter: readonly PortfolioStatusFilter[]): Promise<PublicPortfolio> => ({
@@ -203,6 +204,8 @@ export const handlePublicPortfolioRequest = async (
   }
 
   const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
+  const filter = parsePortfolioStatuses(requestUrl.searchParams);
+  if (!filter) return jsonResponse(response, 400, { error: "포트폴리오 PR 상태가 올바르지 않습니다." }, "no-store");
   const login = text(requestUrl.searchParams.get("login"), 39);
   if (!isValidPortfolioLogin(login)) {
     return jsonResponse(response, 400, { error: "GitHub 사용자 이름이 올바르지 않습니다." });
@@ -227,7 +230,7 @@ export const handlePublicPortfolioRequest = async (
       return jsonResponse(response, 404, { error: "공개 포트폴리오를 찾지 못했습니다." });
     }
 
-    return jsonResponse(response, 200, await portfolioFromUser(database, user));
+    return jsonResponse(response, 200, await portfolioFromUser(database, user, filter), "no-store");
   } catch (error) {
     console.error("Public portfolio API failed", error);
     return jsonResponse(response, 500, { error: "공개 포트폴리오를 불러오지 못했습니다." });
@@ -251,9 +254,8 @@ export const handlePublicPortfolioSnapshotRequest = async (
     }
 
     const requestUrl = new URL(request.url || "/", "http://127.0.0.1");
-    const requestedStatuses = requestUrl.searchParams.getAll("status");
-    const filter = requestedStatuses.length ? requestedStatuses : ["merged"];
-    if (!filter.every(isPortfolioStatusFilter)) {
+    const filter = parsePortfolioStatuses(requestUrl.searchParams);
+    if (!filter) {
       return jsonResponse(response, 400, { error: "공유할 PR 상태가 올바르지 않습니다." }, "no-store");
     }
 

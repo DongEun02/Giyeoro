@@ -26,16 +26,23 @@
 
 .contribution-dashboard { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding-bottom: 80px; }
 .contribution-heading { padding-top: 64px; }
+.portfolio-summary-overview { display: grid; gap: 10px; }
+.portfolio-summary-title { color: #52645b; font-size: 12px; font-weight: 700; }
 .contribution-dashboard-summary { margin: 28px 0 18px; padding: 22px 24px; border: 1px solid #e2e7e3; border-radius: 16px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 28px; background: #fff; }
 .contribution-summary-stats { display: flex; gap: 28px; }.contribution-summary-stats div { display: flex; flex-direction: column; align-items: center; }.contribution-summary-stats strong { font-size: 22px; }.contribution-summary-stats span { color: #7b847f; font-size: 12px; }
 .portfolio-share-controls { display: flex; flex-direction: column; gap: 10px; }
 .portfolio-share-statuses { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; padding: 0; margin: 0; border: 0; }
-.portfolio-share-statuses legend { margin-bottom: 8px; color: #52645b; font-size: 12px; }
+.portfolio-share-statuses legend { margin-bottom: 12px; color: #263e32; font-size: 14px; font-weight: 700; }
 .portfolio-share-statuses label { display: inline-flex; align-items: center; gap: 5px; color: #52645b; font-size: 12px; cursor: pointer; }
 .portfolio-share-statuses input { margin: 0; accent-color: #32805b; }
 .portfolio-share-statuses input:focus-visible { outline: 2px solid #32805b; outline-offset: 2px; }
-.portfolio-share-controls > small { color: #68716c; font-size: 12px; }
 .portfolio-share-controls > button { justify-content: center; }
+.portfolio-display-settings { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 28px; padding: 20px 24px; border: 1px solid #e0e5e1; border-radius: 14px; background: #fff; }
+.portfolio-display-settings p { margin: 10px 0 0; color: #7a837e; font-size: 12px; line-height: 1.6; }
+.portfolio-display-settings small { display: block; margin-top: 8px; color: #68716c; font-size: 12px; }
+.portfolio-display-preview { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 10px 12px; border: 1px solid #dce4dd; border-radius: 8px; background: #fff; color: #496057; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.portfolio-display-preview:disabled { opacity: .5; cursor: default; }
+.portfolio-display-preview:focus-visible { outline: 2px solid #32805b; outline-offset: 2px; }
 .contribution-sync { margin-bottom: 42px; }
 .contribution-section-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 18px; }.contribution-section-heading span { color: #32805b; font-size: 11px; font-weight: 800; letter-spacing: .1em; }.contribution-section-heading h2 { margin: 4px 0 0; font-size: 24px; }.contribution-section-heading > button { border: 0; background: transparent; display: flex; align-items: center; gap: 6px; color: #496057; cursor: pointer; font-weight: 700; }
 .contribution-status-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
@@ -58,10 +65,11 @@
 
 @media (max-width: 720px) {
   .contribution-landing-hero { padding-top: 64px; }.contribution-landing-hero p br { display: none; }.contribution-landing-preview { padding: 18px; }.contribution-preview-header > strong { display: none; }
-  .contribution-dashboard-summary { grid-template-columns: 1fr; }.contribution-summary-stats { justify-content: space-between; }.contribution-dashboard-summary > button { width: 100%; justify-content: center; }
+  .contribution-dashboard-summary { grid-template-columns: 1fr; }.contribution-summary-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; text-align: center; }.contribution-dashboard-summary > button { width: 100%; justify-content: center; }
   .contribution-project-card > header,.portfolio-project-card > header { grid-template-columns: 44px minmax(0,1fr); padding: 18px; }.contribution-project-card header > img,.portfolio-project-card header > img { width: 44px; height: 44px; }.contribution-project-diff,.contribution-hide-button,.portfolio-project-diff { grid-column: 2; }.contribution-project-diff,.portfolio-project-diff { justify-self: end; }.contribution-hide-button { justify-self: start; }
   .contribution-pr-row,.portfolio-project-prs a { grid-template-columns: 58px minmax(0,1fr) 16px; padding: 13px 18px; }.contribution-pr-row small,.portfolio-project-prs a small { display: none; }
   .contribution-section-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .portfolio-display-settings { align-items: flex-start; flex-direction: column; gap: 16px; padding: 20px; }
 }
 
 /* Full-screen product entrance */

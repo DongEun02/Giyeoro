@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { BrandMark } from "../components/BrandMark";
 import { Icons } from "../components/Icons";
 import { getRepoVisual } from "../data/content";
 import { fetchPublicPortfolio, fetchPublicPortfolioSnapshot } from "../services/publicPortfolio";
 import type { PublicPortfolio, PublicPortfolioItem } from "../services/publicPortfolio";
+import { parsePortfolioStatuses } from "../../shared/publicPortfolio";
 
 const dateFormatter = new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "short", day: "numeric" });
 
@@ -36,6 +37,8 @@ type PortfolioPageProps = {
 
 export function PortfolioPage({ snapshot = false }: PortfolioPageProps) {
   const { login = "", snapshotId = "" } = useParams();
+  const [searchParams] = useSearchParams();
+  const statusQuery = searchParams.toString();
   const [portfolio, setPortfolio] = useState<PublicPortfolio | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -44,9 +47,15 @@ export function PortfolioPage({ snapshot = false }: PortfolioPageProps) {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(""); setPortfolio(null);
+    setExpandedRepos(new Set());
+    const statuses = parsePortfolioStatuses(new URLSearchParams(statusQuery));
+    if (!snapshot && !statuses) {
+      setError("포트폴리오 PR 상태가 올바르지 않습니다."); setLoading(false);
+      return () => controller.abort();
+    }
     const request = snapshot
       ? fetchPublicPortfolioSnapshot(snapshotId, controller.signal)
-      : fetchPublicPortfolio(login, controller.signal);
+      : fetchPublicPortfolio(login, controller.signal, statuses || ["merged"]);
     request
       .then(setPortfolio)
       .catch(fetchError => {
@@ -55,7 +64,7 @@ export function PortfolioPage({ snapshot = false }: PortfolioPageProps) {
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [login, snapshot, snapshotId]);
+  }, [login, snapshot, snapshotId, statusQuery]);
 
   const repositories = useMemo(() => groupByRepository(portfolio?.items || []), [portfolio]);
 
@@ -80,12 +89,12 @@ export function PortfolioPage({ snapshot = false }: PortfolioPageProps) {
           </a>
           <div><span>Open Source Contributions</span><h1 id="portfolio-title">{profile.name}의 오픈소스 기여</h1><a href={profile.profileUrl || undefined} target="_blank" rel="noreferrer">@{profile.login}<Icons.ArrowRight className="w-3.5 h-3.5" /></a></div>
         </div>
-        <p className="portfolio-disclosure">{snapshot ? "공유 시점에 선택한 Pull Request를 그대로 보여주는 포트폴리오입니다." : "GitHub에서 병합이 확인된 Pull Request를 프로젝트별로 정리했습니다."}</p>
+        <p className="portfolio-disclosure">{snapshot ? "공유 시점에 선택한 Pull Request를 그대로 보여주는 포트폴리오입니다." : "선택한 상태의 Pull Request를 프로젝트별로 정리했습니다."}</p>
       </section>
 
       <section className="portfolio-stats" aria-label="공개 기여 요약">
         <div><strong>{repositories.length}</strong><span>기여 프로젝트</span></div>
-        <div><strong>{items.length}</strong><span>{items.every(item => !item.state || item.state === "merged") ? "병합된 PR" : "공유된 PR"}</span></div>
+        <div><strong>{items.length}</strong><span>{items.every(item => !item.state || item.state === "merged") ? "병합된 PR" : snapshot ? "공유된 PR" : "선택한 PR"}</span></div>
         <div><strong>+{totalAdditions.toLocaleString()}</strong><span>추가한 코드</span></div>
         <div><strong>{new Set(items.flatMap(item => item.languageTags)).size}</strong><span>사용 언어</span></div>
       </section>
@@ -100,7 +109,7 @@ export function PortfolioPage({ snapshot = false }: PortfolioPageProps) {
             <div className="portfolio-project-prs">{visibleItems.map(item => <a href={item.url || undefined} target="_blank" rel="noreferrer" key={item.id}><span className={`is-${item.state || "merged"}`}>{item.state === "open" ? "Open" : item.state === "closed" ? "Closed" : "Merged"}</span><strong>{item.title}</strong><small>#{item.number} · {dateFormatter.format(new Date(item.completedAt))}</small><Icons.ArrowRight className="w-4 h-4" /></a>)}</div>
             {project.items.length > 3 ? <button type="button" onClick={() => toggleRepository(project.repo)}>{expanded ? "대표 PR만 보기" : `전체 PR ${project.items.length}개 보기`}</button> : null}
           </article>;
-        })}</div> : <div className="portfolio-empty"><Icons.GitPullRequest className="w-5 h-5" /><strong>{snapshot ? "공유된 PR이 없습니다." : "아직 공개할 병합 PR이 없습니다."}</strong><p>{snapshot ? "공유 시점에 선택한 상태의 PR이 없습니다." : "병합된 오픈소스 PR이 생기면 프로젝트별로 표시됩니다."}</p></div>}
+        })}</div> : <div className="portfolio-empty"><Icons.GitPullRequest className="w-5 h-5" /><strong>{snapshot ? "공유된 PR이 없습니다." : "선택한 상태의 PR이 없습니다."}</strong><p>{snapshot ? "공유 시점에 선택한 상태의 PR이 없습니다." : "내 기여에서 포트폴리오에 표시할 PR 상태를 변경해 보세요."}</p></div>}
       </section>
     </div>
   );

@@ -14,6 +14,8 @@ type MyPageProps = {
   onOpen: (item: WorkspaceItem) => void;
   onOpenPortfolio: () => void;
   onSharePortfolio: (statuses: PortfolioStatusFilter[]) => void;
+  portfolioStatuses: PortfolioStatusFilter[];
+  onPortfolioStatusesChange: (statuses: PortfolioStatusFilter[]) => void;
   portfolioCopied: boolean;
   portfolioShareLoading: boolean;
   pullRequestSyncLoading: boolean;
@@ -94,12 +96,12 @@ const groupPullRequests = (items: Record<string, WorkspaceItem>, filter: PullReq
 };
 
 export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio, portfolioCopied, portfolioShareLoading,
+  portfolioStatuses: shareStatuses, onPortfolioStatusesChange: setShareStatuses,
   pullRequestSyncLoading, pullRequestSyncProgress, pullRequestSyncError, pullRequestSyncedAt, pullRequestImportedCount,
   pullRequestScannedCount, pullRequestSyncTruncated, ignoredPullRequests, onPullRequestSync,
   updatingRepository, onHideRepository, onRestoreRepository }: MyPageProps) => {
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(() => new Set());
   const [statusFilter, setStatusFilter] = useState<PullRequestFilter>("all");
-  const [shareStatuses, setShareStatuses] = useState<PortfolioStatusFilter[]>(["merged"]);
   const [lastSharedStatuses, setLastSharedStatuses] = useState("");
   const shareStatusKey = [...shareStatuses].sort().join(",");
   const selectedPortfolioCopied = portfolioCopied && shareStatusKey === lastSharedStatuses;
@@ -121,6 +123,11 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
     { value: "open", label: "진행 중", count: openCount },
     { value: "closed", label: "닫힘", count: closedCount }
   ];
+  const portfolioSummaryFilters = statusFilters.filter(option => option.value !== "all"
+    && (shareStatuses.includes("all") || shareStatuses.includes(option.value)));
+  const portfolioProjectCount = repositories.filter(project => project.items.some(item =>
+    shareStatuses.includes("all") || shareStatuses.some(status => status === pullRequestState(item).toLowerCase())
+  )).length;
   const savedPullRequestCount = Object.values(items).filter(item => item.kind === "pull_request").length;
   const syncedAtLabel = pullRequestSyncedAt ? syncDateFormatter.format(new Date(pullRequestSyncedAt)) : "아직 동기화 전";
 
@@ -137,38 +144,25 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
         <p>흩어진 GitHub PR을 프로젝트별로 모으고, 하나의 링크로 공유하세요.</p>
       </header>
 
-      <section className="contribution-dashboard-summary" aria-label="기여 요약">
+      <section className="contribution-dashboard-summary" aria-label="포트폴리오 요약">
         <div className="mypage-profile">
           <a href={user.profileUrl} target="_blank" rel="noreferrer" className="mypage-profile-mark" aria-label={`${user.login} GitHub 프로필 열기`}>
             {user.avatarUrl ? <img src={user.avatarUrl} alt="" width="42" height="42" referrerPolicy="no-referrer" /> : <BrandMark />}
           </a>
           <div><strong>{user.name}</strong><span>@{user.login}</span></div>
         </div>
-        <div className="contribution-summary-stats">
-          <div><strong>{repositories.length}</strong><span>프로젝트</span></div>
-          <div><strong>{mergedCount}</strong><span>병합된 PR</span></div>
-          <div><strong>{openCount}</strong><span>진행 중 PR</span></div>
+        <div className="portfolio-summary-overview">
+          <span className="portfolio-summary-title">포트폴리오 요약</span>
+          <div className="contribution-summary-stats" role="status" aria-live="polite" aria-atomic="true">
+            <div><strong>{portfolioProjectCount}</strong><span>프로젝트</span></div>
+            {portfolioSummaryFilters.map(option => <div key={option.value}><strong>{option.count}</strong><span>{option.value === "merged" ? "병합된 PR" : option.value === "open" ? "진행 중 PR" : "닫힌 PR"}</span></div>)}
+          </div>
         </div>
         <div className="portfolio-share-controls">
-          <fieldset disabled={portfolioShareLoading} className="portfolio-share-statuses">
-            <legend>공유할 PR 상태</legend>
-            {portfolioStatusFilters.map(option => <label key={option.value}>
-              <input type="checkbox"
-                checked={option.value === "all" ? allShareStatusesSelected : shareStatuses.includes(option.value)}
-                onChange={event => {
-                  const checked = event.target.checked;
-                  setShareStatuses(current => option.value === "all"
-                    ? checked ? individualShareOptions.map(status => status.value) : []
-                    : checked ? [...current, option.value] : current.filter(status => status !== option.value));
-                }} />
-              {option.label}
-            </label>)}
-          </fieldset>
           <button type="button" className="mypage-portfolio-share-button" onClick={() => { setLastSharedStatuses(shareStatusKey); onSharePortfolio(shareStatuses); }} disabled={portfolioShareLoading || shareStatuses.length === 0}>
             {selectedPortfolioCopied ? <Icons.Check className="w-4 h-4" /> : <Icons.Clipboard className="w-4 h-4" />}
             {portfolioShareLoading ? "공유본 만드는 중" : selectedPortfolioCopied ? "링크 복사됨" : "포트폴리오 공유"}
           </button>
-          {shareStatuses.length === 0 ? <small>공유할 상태를 하나 이상 선택해 주세요.</small> : null}
         </div>
       </section>
 
@@ -182,7 +176,28 @@ export const MyPage = ({ user, items, onOpen, onOpenPortfolio, onSharePortfolio,
       </section>
 
       <section className="contribution-projects" aria-labelledby="projects-title">
-        <div className="contribution-section-heading"><div><span>Projects</span><h2 id="projects-title">프로젝트별 기여</h2></div><button type="button" onClick={onOpenPortfolio}>공개 페이지 미리보기 <Icons.ArrowRight className="w-4 h-4" /></button></div>
+        <div className="portfolio-display-settings">
+          <div>
+          <fieldset disabled={portfolioShareLoading} className="portfolio-share-statuses" aria-describedby="portfolio-display-help">
+            <legend>포트폴리오 표시 설정</legend>
+            {portfolioStatusFilters.map(option => <label key={option.value}>
+              <input type="checkbox"
+                checked={option.value === "all" ? allShareStatusesSelected : shareStatuses.includes(option.value)}
+                onChange={event => {
+                  const checked = event.target.checked;
+                  setShareStatuses(option.value === "all"
+                    ? checked ? individualShareOptions.map(status => status.value) : []
+                    : checked ? [...shareStatuses, option.value] : shareStatuses.filter(status => status !== option.value));
+                }} />
+              {option.label}
+            </label>)}
+          </fieldset>
+            <p id="portfolio-display-help">공개 페이지와 새로 만드는 공유본에 적용됩니다.</p>
+            {shareStatuses.length === 0 ? <small role="status">표시할 상태를 하나 이상 선택해 주세요.</small> : null}
+          </div>
+          <button type="button" className="portfolio-display-preview" onClick={onOpenPortfolio} disabled={shareStatuses.length === 0}>공개 페이지 미리보기 <Icons.ArrowRight className="w-4 h-4" /></button>
+        </div>
+        <div className="contribution-section-heading"><div><span>Projects</span><h2 id="projects-title">프로젝트별 기여</h2></div></div>
         <div className="contribution-status-filters" role="group" aria-label="PR 상태 필터">
           {statusFilters.map(option => <button type="button" key={option.value} aria-pressed={statusFilter === option.value} onClick={() => { setStatusFilter(option.value); setExpandedRepos(new Set()); }}>{option.label}<span>{option.count}</span></button>)}
         </div>

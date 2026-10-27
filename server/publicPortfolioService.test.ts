@@ -5,7 +5,15 @@ import {
   isValidPortfolioLogin,
   isValidPortfolioSnapshotId
 } from "./publicPortfolioService.js";
-import { isPortfolioStatusFilter } from "../shared/publicPortfolio.js";
+import { isPortfolioStatusFilter, parsePortfolioStatuses } from "../shared/publicPortfolio.js";
+
+test("미리보기와 공유본은 같은 다중 상태 쿼리를 해석한다", () => {
+  assert.deepEqual(parsePortfolioStatuses(new URLSearchParams()), ["merged"]);
+  assert.deepEqual(parsePortfolioStatuses(new URLSearchParams("status=merged&status=open&status=merged")), ["merged", "open"]);
+  assert.deepEqual(parsePortfolioStatuses(new URLSearchParams("status=all")), ["all"]);
+  assert.equal(parsePortfolioStatuses(new URLSearchParams("status=merged&status=invalid")), null);
+  assert.equal(parsePortfolioStatuses(new URLSearchParams("status=")), null);
+});
 
 test("공유할 PR 상태는 지정된 네 가지 값만 허용한다", () => {
   for (const state of ["all", "merged", "open", "closed"]) assert.equal(isPortfolioStatusFilter(state), true);

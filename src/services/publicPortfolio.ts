@@ -35,9 +35,11 @@ export type PublicPortfolio = {
 
 export const fetchPublicPortfolio = async (
   login: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  statuses: PortfolioStatusFilter[] = ["merged"]
 ): Promise<PublicPortfolio> => {
   const parameters = new URLSearchParams({ operation: "portfolio", login });
+  statuses.forEach(status => parameters.append("status", status));
   const response = await fetch(`/api/workspace?${parameters.toString()}`, {
     headers: { Accept: "application/json" },
     signal

@@ -10,3 +10,9 @@ export type PortfolioStatusFilter = typeof portfolioStatusFilters[number]["value
 export const isPortfolioStatusFilter = (value: unknown): value is PortfolioStatusFilter => (
   portfolioStatusFilters.some(option => option.value === value)
 );
+
+export const parsePortfolioStatuses = (parameters: URLSearchParams): PortfolioStatusFilter[] | null => {
+  const requested = parameters.getAll("status");
+  if (!requested.length) return ["merged"];
+  return requested.every(isPortfolioStatusFilter) ? [...new Set(requested)] : null;
+};

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { OssAppProvider } from "./app/OssAppContext";
@@ -20,6 +20,8 @@ import {
 } from "./services/userWorkspace";
 import type { WorkspaceItem } from "./services/userWorkspace";
 import { fetchWorkspaceItems, syncRemoteGithubPullRequests, syncWorkspaceItems } from "./services/workspace";
+import { buildPortfolioPath, readPortfolioStatuses, savePortfolioStatuses } from "./services/portfolioPreferences";
+import type { PortfolioStatusFilter } from "../shared/publicPortfolio";
 
 export default function App() {
   const location = useLocation();
@@ -40,6 +42,16 @@ export default function App() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState("");
   const [toast, setToast] = useState("");
+  const [portfolioSelections, setPortfolioSelections] = useState<Record<string, PortfolioStatusFilter[]>>({});
+  const portfolioStatuses = useMemo(() => authUser
+    ? portfolioSelections[authUser.login.toLowerCase()] ?? readPortfolioStatuses(authUser.login)
+    : ["merged"] as PortfolioStatusFilter[], [authUser?.login, portfolioSelections]);
+  const setPortfolioStatuses = (statuses: PortfolioStatusFilter[]) => {
+    if (!authUser) return;
+    savePortfolioStatuses(authUser.login, statuses);
+    setPortfolioSelections(current => ({ ...current, [authUser.login.toLowerCase()]: statuses }));
+  };
+  const portfolioPath = authUser ? buildPortfolioPath(authUser.login, portfolioStatuses) : "/contributions";
 
   useEffect(() => { initializeAnalytics(); }, []);
 
@@ -157,6 +169,9 @@ export default function App() {
     trackedTasks,
     syncGithubPullRequests,
     refreshWorkspaceItems,
+    portfolioStatuses,
+    setPortfolioStatuses,
+    portfolioPath,
     openWorkspaceItem,
     triggerToast
   };
@@ -169,7 +184,7 @@ export default function App() {
         {view !== "landing" ? <header className={`app-header ${view === "share" ? "app-header-share" : ""}`}>
           <div className="app-header-inner max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
             <button type="button" className="app-brand flex items-center gap-3" onClick={() => navigate("/")}><span className="brand-mark"><BrandMark /></span><span className="brand-name font-bold text-[#1f2933] text-sm tracking-tight">기여로</span></button>
-            {(view === "contributions" || view === "portfolio") && authUser ? <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴"><button type="button" onClick={() => navigate("/contributions")} className={`nav-button text-xs px-3 py-1.5 ${view === "contributions" ? "nav-button-active" : ""}`}>내 기여</button><button type="button" onClick={() => navigate(`/portfolio/${encodeURIComponent(authUser.login)}`)} className={`nav-button text-xs px-3 py-1.5 ${view === "portfolio" ? "nav-button-active" : ""}`}>공개 페이지</button></nav> : null}
+            {(view === "contributions" || view === "portfolio") && authUser ? <nav className="app-nav flex items-center gap-2" aria-label="주요 메뉴"><button type="button" onClick={() => navigate("/contributions")} className={`nav-button text-xs px-3 py-1.5 ${view === "contributions" ? "nav-button-active" : ""}`}>내 기여</button><button type="button" onClick={() => navigate(portfolioPath)} disabled={portfolioStatuses.length === 0} className={`nav-button text-xs px-3 py-1.5 ${view === "portfolio" ? "nav-button-active" : ""}`}>공개 페이지</button></nav> : null}
             {view === "contributions" || view === "portfolio" ? <GitHubAuthControl user={authUser} loading={authLoading} loggingOut={authLogoutLoading} loginHref={getGithubLoginUrl(`${location.pathname}${location.search}${location.hash}`)} onLogin={() => trackAnalyticsEvent("login", { method: "github" })} onLogout={handleGithubLogout} /> : null}
           </div>
         </header> : null}

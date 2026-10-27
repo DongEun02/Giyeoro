@@ -37,6 +37,9 @@ export function WorkspacePage() {
     trackedTasks,
     syncGithubPullRequests,
     refreshWorkspaceItems,
+    portfolioStatuses,
+    setPortfolioStatuses,
+    portfolioPath,
     openWorkspaceItem,
     triggerToast
   } = useOssApp();
@@ -45,10 +48,6 @@ export function WorkspacePage() {
   const syncControllerRef = useRef<AbortController | null>(null);
   syncGithubPullRequestsRef.current = syncGithubPullRequests;
   triggerToastRef.current = triggerToast;
-
-  const portfolioPath = authUser
-    ? `/portfolio/${encodeURIComponent(authUser.login)}`
-    : "/contributions";
 
   const handlePortfolioShare = async (statuses: PortfolioStatusFilter[]) => {
     if (portfolioShareLoading) return;
@@ -224,6 +223,8 @@ export function WorkspacePage() {
         onOpen={openWorkspaceItem}
         onOpenPortfolio={() => navigate(portfolioPath)}
         onSharePortfolio={handlePortfolioShare}
+        portfolioStatuses={portfolioStatuses}
+        onPortfolioStatusesChange={setPortfolioStatuses}
         portfolioCopied={portfolioCopied}
         portfolioShareLoading={portfolioShareLoading}
         pullRequestSyncLoading={pullRequestSyncLoading}
