@@ -105,7 +105,9 @@ export const MyPage = ({ user, items, onOpenPortfolio, onSharePortfolio, portfol
   const shareStatusKey = [...shareStatuses].sort().join(",");
   const selectedPortfolioCopied = portfolioCopied && shareStatusKey === lastSharedStatuses;
   const individualShareOptions = portfolioStatusFilters.filter(option => option.value !== "all");
-  const allShareStatusesSelected = individualShareOptions.every(option => shareStatuses.includes(option.value));
+  const selectedShareStatuses = individualShareOptions
+    .map(option => option.value)
+    .filter(status => shareStatuses.includes("all") || shareStatuses.includes(status));
   const repositories = useMemo(() => groupPullRequests(items), [items]);
   const visibleRepositories = useMemo(() => groupPullRequests(items, statusFilter), [items, statusFilter]);
   const ignoredRepositories = useMemo(() => {
@@ -143,6 +145,15 @@ export const MyPage = ({ user, items, onOpenPortfolio, onSharePortfolio, portfol
         <p>흩어진 GitHub PR을 프로젝트별로 모으고, 하나의 링크로 공유하세요.</p>
       </header>
 
+      <section className="mypage-pr-sync contribution-sync" aria-labelledby="sync-title">
+        <div className="mypage-pr-sync-copy"><span>GitHub Sync</span><h2 id="sync-title">스타 50개 이상인 프로젝트의 PR을 모아요</h2><p>공개된 외부 저장소의 열린 PR과 병합된 PR을 가져와 프로젝트별로 정리합니다. 프로젝트 하나를 통째로 숨길 수도 있어요.</p></div>
+        <div className="mypage-pr-sync-actions">
+          <div className="mypage-pr-sync-status" aria-live="polite"><span>{pullRequestSyncLoading ? `GitHub PR 자동 확인 중${pullRequestSyncProgress ? ` · 이번 방문 ${pullRequestSyncProgress}개 확인` : ""}` : `최근 동기화 ${syncedAtLabel}`}</span><small>저장된 PR {savedPullRequestCount}개{!pullRequestSyncLoading && pullRequestSyncedAt ? ` · 마지막 동기화: ${pullRequestScannedCount}개 확인, ${pullRequestImportedCount}개 새로 저장${pullRequestSyncTruncated ? " · 이어서 확인 가능" : ""}` : ""}</small></div>
+          <button type="button" onClick={onPullRequestSync} disabled={pullRequestSyncLoading}><Icons.Refresh className="w-4 h-4" />{pullRequestSyncLoading ? "확인 중" : pullRequestSyncError ? "다시 시도" : "지금 동기화"}</button>
+        </div>
+        {pullRequestSyncError ? <p className="mypage-pr-sync-error" role="alert">{pullRequestSyncError}</p> : null}
+      </section>
+
       <section className="contribution-dashboard-summary" aria-label="포트폴리오 요약">
         <div className="mypage-profile">
           <a href={user.profileUrl} target="_blank" rel="noreferrer" className="mypage-profile-mark" aria-label={`${user.login} GitHub 프로필 열기`}>
@@ -157,45 +168,37 @@ export const MyPage = ({ user, items, onOpenPortfolio, onSharePortfolio, portfol
             {portfolioSummaryFilters.map(option => <div key={option.value}><strong>{option.count}</strong><span>{option.value === "merged" ? "병합된 PR" : option.value === "open" ? "진행 중 PR" : "닫힌 PR"}</span></div>)}
           </div>
         </div>
-        <div className="portfolio-share-controls">
-          <button type="button" className="mypage-portfolio-share-button" onClick={() => { setLastSharedStatuses(shareStatusKey); onSharePortfolio(shareStatuses); }} disabled={portfolioShareLoading || shareStatuses.length === 0}>
-            {selectedPortfolioCopied ? <Icons.Check className="w-4 h-4" /> : <Icons.Clipboard className="w-4 h-4" />}
-            {portfolioShareLoading ? "공유본 만드는 중" : selectedPortfolioCopied ? "링크 복사됨" : "포트폴리오 공유"}
-          </button>
+        <div className="portfolio-display-settings">
+          <fieldset disabled={portfolioShareLoading} className="portfolio-share-statuses" aria-describedby="portfolio-display-help">
+            <legend>공개 포트폴리오에 표시할 PR</legend>
+            {individualShareOptions.map(({ value }) => (
+              <label key={value}>
+                <input
+                  type="checkbox"
+                  checked={selectedShareStatuses.includes(value)}
+                  onChange={event => setShareStatuses(event.target.checked
+                    ? [...selectedShareStatuses, value]
+                    : selectedShareStatuses.filter(status => status !== value))}
+                />
+                {value === "merged" ? "병합된 PR" : value === "open" ? "진행 중 PR" : "닫힌 PR"}
+              </label>
+            ))}
+          </fieldset>
+          <p id="portfolio-display-help">선택한 상태의 PR만 공개 페이지와 새 공유 링크에 표시돼요.</p>
+          {shareStatuses.length === 0 ? <small role="status">표시할 상태를 하나 이상 선택해 주세요.</small> : null}
+          <div className="portfolio-share-controls">
+            <button type="button" className="portfolio-display-preview" onClick={onOpenPortfolio} disabled={shareStatuses.length === 0}>
+              공개 화면 미리보기 <Icons.ArrowRight className="w-4 h-4" />
+            </button>
+            <button type="button" className="mypage-portfolio-share-button" onClick={() => { setLastSharedStatuses(shareStatusKey); onSharePortfolio(shareStatuses); }} disabled={portfolioShareLoading || shareStatuses.length === 0}>
+              {selectedPortfolioCopied ? <Icons.Check className="w-4 h-4" /> : <Icons.Clipboard className="w-4 h-4" />}
+              {portfolioShareLoading ? "공유본 만드는 중" : selectedPortfolioCopied ? "링크 복사됨" : "공유 링크 복사"}
+            </button>
+          </div>
         </div>
-      </section>
-
-      <section className="mypage-pr-sync contribution-sync" aria-labelledby="sync-title">
-        <div className="mypage-pr-sync-copy"><span>GitHub Sync</span><h2 id="sync-title">스타 50개 이상인 프로젝트의 PR을 모아요</h2><p>공개된 외부 저장소의 열린 PR과 병합된 PR을 가져와 프로젝트별로 정리합니다. 프로젝트 하나를 통째로 숨길 수도 있어요.</p></div>
-        <div className="mypage-pr-sync-actions">
-          <div className="mypage-pr-sync-status" aria-live="polite"><span>{pullRequestSyncLoading ? `GitHub PR 자동 확인 중${pullRequestSyncProgress ? ` · 이번 방문 ${pullRequestSyncProgress}개 확인` : ""}` : `최근 동기화 ${syncedAtLabel}`}</span><small>저장된 PR {savedPullRequestCount}개{!pullRequestSyncLoading && pullRequestSyncedAt ? ` · 마지막 동기화: ${pullRequestScannedCount}개 확인, ${pullRequestImportedCount}개 새로 저장${pullRequestSyncTruncated ? " · 이어서 확인 가능" : ""}` : ""}</small></div>
-          <button type="button" onClick={onPullRequestSync} disabled={pullRequestSyncLoading}><Icons.Refresh className="w-4 h-4" />{pullRequestSyncLoading ? "확인 중" : pullRequestSyncError ? "다시 시도" : "지금 동기화"}</button>
-        </div>
-        {pullRequestSyncError ? <p className="mypage-pr-sync-error" role="alert">{pullRequestSyncError}</p> : null}
       </section>
 
       <section className="contribution-projects" aria-labelledby="projects-title">
-        <div className="portfolio-display-settings">
-          <div>
-          <fieldset disabled={portfolioShareLoading} className="portfolio-share-statuses" aria-describedby="portfolio-display-help">
-            <legend>포트폴리오 표시 설정</legend>
-            {portfolioStatusFilters.map(option => <label key={option.value}>
-              <input type="checkbox"
-                checked={option.value === "all" ? allShareStatusesSelected : shareStatuses.includes(option.value)}
-                onChange={event => {
-                  const checked = event.target.checked;
-                  setShareStatuses(option.value === "all"
-                    ? checked ? individualShareOptions.map(status => status.value) : []
-                    : checked ? [...shareStatuses, option.value] : shareStatuses.filter(status => status !== option.value));
-                }} />
-              {option.label}
-            </label>)}
-          </fieldset>
-            <p id="portfolio-display-help">공개 페이지와 새로 만드는 공유본에 적용됩니다.</p>
-            {shareStatuses.length === 0 ? <small role="status">표시할 상태를 하나 이상 선택해 주세요.</small> : null}
-          </div>
-          <button type="button" className="portfolio-display-preview" onClick={onOpenPortfolio} disabled={shareStatuses.length === 0}>공개 페이지 미리보기 <Icons.ArrowRight className="w-4 h-4" /></button>
-        </div>
         <div className="contribution-section-heading"><div><span>Projects</span><h2 id="projects-title">프로젝트별 기여</h2></div></div>
         <div className="contribution-status-filters" role="group" aria-label="PR 상태 필터">
           {statusFilters.map(option => <button type="button" key={option.value} aria-pressed={statusFilter === option.value} onClick={() => { setStatusFilter(option.value); setExpandedRepos(new Set()); }}>{option.label}<span>{option.count}</span></button>)}
