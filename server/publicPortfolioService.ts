@@ -11,14 +11,6 @@ type PublicPortfolioOptions = GithubAuthOptions & {
   databaseUrl?: string;
 };
 
-type PortfolioUserRow = {
-  github_id: number | string;
-  github_login: string;
-  name: string;
-  avatar_url: string;
-  profile_url: string;
-};
-
 type PortfolioItemRow = {
   item_id: string;
   kind: "issue" | "translation" | "pull_request";
@@ -54,7 +46,7 @@ const jsonResponse = (
   response: any,
   status: number,
   body: unknown,
-  cacheControl = "public, max-age=0, s-maxage=60, stale-while-revalidate=300"
+  cacheControl = "no-store"
 ) => {
   response.statusCode = status;
   response.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -169,20 +161,6 @@ const listPublicPortfolioItems = async (database: Database, userId: number | str
     .map(mapPortfolioItem);
 };
 
-const portfolioFromUser = async (
-  database: Database,
-  user: Pick<PortfolioUserRow, "github_id" | "github_login" | "name" | "avatar_url" | "profile_url">,
-  filter: readonly PortfolioStatusFilter[]
-): Promise<PublicPortfolio> => ({
-  profile: {
-    login: text(user.github_login, 39),
-    name: text(user.name, 200, user.github_login),
-    avatarUrl: safeHttpsUrl(user.avatar_url),
-    profileUrl: safeHttpsUrl(user.profile_url, "github.com")
-  },
-  items: await listPublicPortfolioItems(database, user.github_id, filter)
-});
-
 const portfolioFromSessionUser = async (database: Database, user: GithubUser, filter: readonly PortfolioStatusFilter[]): Promise<PublicPortfolio> => ({
   profile: {
     login: text(user.login, 39),
@@ -211,6 +189,14 @@ export const handlePublicPortfolioRequest = async (
     return jsonResponse(response, 400, { error: "GitHub 사용자 이름이 올바르지 않습니다." });
   }
 
+  const user = readGithubSessionUser(request, options);
+  if (!user) {
+    return jsonResponse(response, 401, { error: "GitHub 로그인이 필요합니다." });
+  }
+  if (user.login.toLowerCase() !== login.toLowerCase()) {
+    return jsonResponse(response, 403, { error: "다른 사용자의 포트폴리오는 공유 링크로만 볼 수 있습니다." });
+  }
+
   const databaseUrl = resolveDatabaseUrl(options);
   if (!databaseUrl) {
     return jsonResponse(response, 503, { error: "데이터베이스가 연결되지 않았습니다." });
@@ -218,19 +204,7 @@ export const handlePublicPortfolioRequest = async (
 
   try {
     const database = getDatabase(databaseUrl);
-    const userResult = await database.execute<PortfolioUserRow>(sql`
-      SELECT github_id, github_login, name, avatar_url, profile_url
-      FROM users
-      WHERE LOWER(github_login) = LOWER(${login})
-      ORDER BY updated_at DESC
-      LIMIT 1
-    `);
-    const user = userResult.rows[0];
-    if (!user) {
-      return jsonResponse(response, 404, { error: "공개 포트폴리오를 찾지 못했습니다." });
-    }
-
-    return jsonResponse(response, 200, await portfolioFromUser(database, user, filter), "no-store");
+    return jsonResponse(response, 200, await portfolioFromSessionUser(database, user, filter));
   } catch (error) {
     console.error("Public portfolio API failed", error);
     return jsonResponse(response, 500, { error: "공개 포트폴리오를 불러오지 못했습니다." });

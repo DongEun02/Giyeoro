@@ -1,3 +1,8 @@
+import { createHmac } from "node:crypto";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
+import { getDatabase } from "./database.js";
+import { handleWorkspaceApiRequest } from "./workspaceApiService.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -83,4 +88,73 @@ test("스타 50개 미만 저장소의 PR은 공개하지 않는다", () => {
 
 test("번역 작업은 완료 상태여도 공개하지 않는다", () => {
   assert.equal(isPublicPortfolioItem({ kind: "translation", status: "completed", data: {} }), false);
+});
+
+const authOptions = {
+  clientId: "test-client",
+  clientSecret: "test-secret",
+  sessionSecret: "test-session-secret-with-at-least-32-characters",
+  appUrl: "https://example.com",
+  databaseUrl: "postgres://test:test@localhost:5432/portfolio_access_test"
+};
+
+const sessionCookie = (login = "octocat", expiresAt = Date.now() + 60_000) => {
+  const payload = Buffer.from(JSON.stringify({
+    id: 123, login, name: "Octocat", avatarUrl: "", profileUrl: "", expiresAt
+  })).toString("base64url");
+  const signature = createHmac("sha256", authOptions.sessionSecret)
+    .update(`session.${payload}`).digest("base64url");
+  return `giyeoro_session=${payload}.${signature}`;
+};
+
+const responseRecorder = () => ({
+  statusCode: 0,
+  headers: {} as Record<string, string>,
+  body: "",
+  setHeader(name: string, value: string) { this.headers[name] = value; },
+  end(body: string) { this.body = body; }
+});
+
+test("미리보기 API는 비로그인, 만료 및 위조 세션의 접근을 차단한다", async () => {
+  for (const cookie of ["", sessionCookie("octocat", Date.now() - 1_000), `${sessionCookie()}tampered`]) {
+    const response = responseRecorder();
+    await handleWorkspaceApiRequest({ method: "GET", url: "/api/workspace?operation=portfolio&login=octocat", headers: { cookie } }, response, authOptions);
+    assert.equal(response.statusCode, 401);
+    assert.equal(response.headers["Cache-Control"], "no-store");
+    assert.equal(JSON.parse(response.body).items, undefined);
+  }
+});
+
+test("로그인해도 다른 사용자의 미리보기 API는 직접 조회할 수 없다", async () => {
+  const response = responseRecorder();
+  await handleWorkspaceApiRequest({ method: "GET", url: "/api/workspace?operation=portfolio&login=another-user&status=all", headers: { cookie: sessionCookie() } }, response, authOptions);
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.headers["Cache-Control"], "no-store");
+  assert.equal(JSON.parse(response.body).items, undefined);
+});
+
+test("본인 미리보기는 대소문자와 무관하게 세션의 사용자 ID로 조회하고 캐시하지 않는다", async t => {
+  const database = getDatabase(authOptions.databaseUrl);
+  const queries: unknown[] = [];
+  t.mock.method(database, "execute", async (query: unknown) => {
+    queries.push(query);
+    return { rows: [] };
+  });
+  const response = responseRecorder();
+  await handleWorkspaceApiRequest({ method: "GET", url: "/api/workspace?operation=portfolio&login=OctoCat", headers: { cookie: sessionCookie() } }, response, authOptions);
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers["Cache-Control"], "no-store");
+  assert.deepEqual(JSON.parse(response.body), { profile: { login: "octocat", name: "Octocat", avatarUrl: "", profileUrl: "" }, items: [] });
+  assert.equal(queries.length, 1);
+  const compiled = new PgDialect().sqlToQuery(queries[0] as SQL);
+  assert.deepEqual(compiled.params, [123]);
+});
+
+test("공유 스냅샷은 로그인 없이 공유 ID로 열람할 수 있다", async t => {
+  const snapshot = { profile: { login: "octocat" }, items: [] };
+  t.mock.method(getDatabase(authOptions.databaseUrl), "execute", async () => ({ rows: [{ snapshot }] }));
+  const response = responseRecorder();
+  await handleWorkspaceApiRequest({ method: "GET", url: "/api/workspace?operation=portfolio-snapshot&id=AbCdEfGhIjKlMnOpQrStUvWx", headers: {} }, response, authOptions);
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(JSON.parse(response.body), snapshot);
 });
