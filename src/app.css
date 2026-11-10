@@ -8611,6 +8611,19 @@ body {
   text-align: center;
 }
 
+.portfolio-state {
+  font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: -.025em;
+}
+
+.portfolio-state h1 {
+  font-weight: 700;
+}
+
+.portfolio-state p {
+  font-weight: 400;
+}
+
 .portfolio-empty strong,
 .portfolio-state strong,
 .portfolio-state h1 {
