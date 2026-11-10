@@ -8616,14 +8616,6 @@ body {
   letter-spacing: -.025em;
 }
 
-.portfolio-state h1 {
-  font-weight: 700;
-}
-
-.portfolio-state p {
-  font-weight: 400;
-}
-
 .portfolio-empty strong,
 .portfolio-state strong,
 .portfolio-state h1 {
@@ -8640,13 +8632,24 @@ body {
   line-height: 1.7;
 }
 
+.portfolio-state strong,
+.portfolio-state h1 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.portfolio-state p {
+  font-size: 13px;
+  font-weight: 400;
+}
+
 .portfolio-state a {
   margin-top: 10px;
   padding: 10px 14px;
   border-radius: 7px;
   background: #171717;
   color: #ffffff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
 }
 
